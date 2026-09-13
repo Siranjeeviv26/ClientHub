@@ -26,6 +26,7 @@ export type Processor<T = any> = (job: Job<T>) => Promise<any>;
 export interface QueueService {
   add<T>(name: string, data: T, opts?: JobOptions): Promise<Job<T>>;
   process(name: string, concurrency: number, processor: Processor): void;
+  removeByDataKey(name: string, key: string, value: any): Promise<void>;
   close(): Promise<void>;
 }
 

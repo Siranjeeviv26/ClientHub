@@ -9,7 +9,7 @@ export interface User {
   avatar?: string;
   phone?: string;
   jobTitle?: string;
-  role: 'ADMIN' | 'MANAGER' | 'SALES' | 'EMPLOYEE';
+  role: Role;
   organizationId: string;
   isActive: boolean;
   emailVerified: boolean;
@@ -61,7 +61,7 @@ export interface OrganizationMember {
   _id: string;
   userId: string;
   organizationId: string;
-  role: 'ADMIN' | 'MANAGER' | 'SALES' | 'EMPLOYEE';
+  role: Role;
   status: 'INVITED' | 'ACTIVE' | 'SUSPENDED';
   invitedBy?: string;
   joinedAt?: string;
@@ -75,7 +75,7 @@ export interface OrganizationInvitation {
   _id: string;
   email: string;
   organizationId: string;
-  role: 'ADMIN' | 'MANAGER' | 'SALES' | 'EMPLOYEE';
+  role: Role;
   token: string;
   expiresAt: string;
   status: 'PENDING' | 'ACCEPTED' | 'EXPIRED' | 'CANCELLED';
@@ -372,4 +372,19 @@ export interface QueryParams {
   dealId?: string;
   overdue?: boolean;
   read?: boolean;
+}
+
+// DTO Types
+export interface InviteMemberDto {
+  email: string;
+  role: Role;
+}
+
+export interface UpdateOrganizationDto {
+  name?: string;
+  slug?: string;
+  timezone?: string;
+  dateFormat?: string;
+  currency?: string;
+  language?: string;
 }

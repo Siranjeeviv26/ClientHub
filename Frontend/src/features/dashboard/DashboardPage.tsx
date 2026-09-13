@@ -35,6 +35,7 @@ import {
 import { useAuth } from "../../contexts/AuthContext";
 import { useOrganization } from "../../contexts/OrganizationContext";
 import { dashboardApi } from "../../api/dashboard";
+import toast from "react-hot-toast";
 import { Button } from "../../components/ui/Button";
 import { Badge } from "../../components/ui/Badge";
 import { Card } from "../../components/ui/Card";
@@ -49,12 +50,13 @@ import {
 } from "../../utils/formatters";
 
 const STAT_COLORS = [
-  "#6366f1",
-  "#059669",
-  "#dc2626",
-  "#f59e0b",
-  "#8b5cf6",
-  "#ec4899",
+  "#111827",
+  "#374151",
+  "#4b5563",
+  "#6b7280",
+  "#9ca3af",
+  "#d1d5db",
+  "#e5e7eb",
 ];
 
 export function DashboardPage() {
@@ -102,6 +104,7 @@ export function DashboardPage() {
           setUpcomingFollowUps(upcomingFollowUpsRes.data);
       } catch (error) {
         console.error("Failed to load dashboard:", error);
+        toast.error("Failed to load dashboard");
       } finally {
         setIsLoading(false);
       }
@@ -113,65 +116,72 @@ export function DashboardPage() {
   const statCards = [
     {
       name: "Total Clients",
-      value: stats?.totalClients || 0,
+      value: stats?.totalClients ?? 0,
+      raw: stats?.totalClients ?? 0,
       icon: Users,
-      color: "#6366f1",
-      bgColor: "bg-primary-100",
+      sub: "in workspace",
+      alert: false,
       link: "/clients",
     },
     {
       name: "New Leads",
-      value: stats?.newLeads || 0,
+      value: stats?.newLeads ?? 0,
+      raw: stats?.newLeads ?? 0,
       icon: Target,
-      color: "#059669",
-      bgColor: "bg-green-100",
+      sub: "last 30 days",
+      alert: false,
       link: "/leads",
     },
     {
       name: "Active Deals",
-      value: stats?.activeDeals || 0,
+      value: stats?.activeDeals ?? 0,
+      raw: stats?.activeDeals ?? 0,
       icon: DollarSign,
-      color: "#dc2626",
-      bgColor: "bg-red-100",
+      sub: "in pipeline",
+      alert: false,
       link: "/deals",
     },
     {
       name: "Won Deals",
-      value: stats?.wonDeals || 0,
+      value: stats?.wonDeals ?? 0,
+      raw: stats?.wonDeals ?? 0,
       icon: TrendingUp,
-      color: "#f59e0b",
-      bgColor: "bg-yellow-100",
+      sub: "closed won",
+      alert: false,
       link: "/deals?stage=won",
     },
     {
       name: "Conversion Rate",
-      value: `${stats?.conversionRate || 0}%`,
+      value: `${stats?.conversionRate ?? 0}%`,
+      raw: `${stats?.conversionRate ?? 0}%`,
       icon: Activity,
-      color: "#8b5cf6",
-      bgColor: "bg-purple-100",
+      sub: "lead to won",
+      alert: false,
       link: "/leads",
     },
     {
       name: "Pending Tasks",
-      value: stats?.pendingTasks || 0,
+      value: stats?.pendingTasks ?? 0,
+      raw: stats?.pendingTasks ?? 0,
       icon: CheckSquare,
-      color: "#ec4899",
-      bgColor: "bg-pink-100",
+      sub: stats?.overdueTasks ? `${stats.overdueTasks} overdue` : "needs attention",
+      alert: (stats?.overdueTasks ?? 0) > 0,
       link: "/tasks",
     },
   ];
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+      <div className="space-y-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
           {Array.from({ length: 6 }).map((_, i) => (
-            <Card key={i} className="p-6 animate-pulse">
-              <div className="flex items-center justify-between">
-                <div className="skeleton h-4 w-24" />
-                <div className="skeleton w-10 h-10 rounded-lg" />
+            <Card key={i} className="p-4 animate-pulse flex items-center gap-4">
+              <div className="skeleton w-11 h-11 rounded-xl shrink-0" />
+              <div className="flex-1">
+                <div className="skeleton h-3 w-20 rounded" />
+                <div className="skeleton h-6 w-24 mt-2 rounded" />
               </div>
-              <div className="skeleton h-8 w-32 mt-4" />
+              <div className="skeleton w-8 h-8 rounded-full shrink-0" />
             </Card>
           ))}
         </div>
@@ -219,27 +229,32 @@ export function DashboardPage() {
         </div>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+      {/* Stats Grid — medium horizontal cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
         {statCards.map((stat) => (
-          <Card key={stat.name} className="stat-card card-hover">
-            <div className="stat-card-header">
-              <span className="stat-card-label">{stat.name}</span>
-              <div
-                className={clsx(
-                  "w-10 h-10 rounded-lg flex items-center justify-center",
-                  stat.bgColor,
-                )}
-              >
-                <stat.icon className="w-5 h-5" style={{ color: stat.color }} />
-              </div>
+          <Card key={stat.name} className="p-4 flex items-center gap-4 hover:shadow-md hover:border-gray-200 transition-all duration-200">
+            <span className="w-11 h-11 rounded-xl bg-gray-900 flex items-center justify-center shrink-0 shadow-sm">
+              <stat.icon className="w-5 h-5 text-white" />
+            </span>
+            <div className="flex-1 min-w-0">
+              <p className="text-[11px] font-semibold tracking-widest uppercase text-gray-400 truncate" title={stat.name}>
+                {stat.name}
+              </p>
+              <p className="mt-0.5 flex items-baseline gap-2 min-w-0">
+                <span className="text-[22px] font-bold tracking-tight text-gray-900 leading-none tabular-nums" style={{ letterSpacing: '-0.02em' }}>
+                  {typeof stat.raw === 'number' ? formatNumber(stat.raw) : stat.value}
+                </span>
+                <span className={`text-xs truncate ${stat.alert ? 'text-red-600 font-medium' : 'text-gray-400'}`}>
+                  {stat.alert && <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-500 mr-1 align-middle" />}
+                  {stat.sub}
+                </span>
+              </p>
             </div>
-            <p className="stat-card-value">{formatNumber(stat.value)}</p>
             <NavLink
               to={stat.link}
-              className="stat-card-trend stat-card-trend-positive flex items-center justify-end text-sm font-medium mt-2"
+              aria-label={`View ${stat.name}`}
+              className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-gray-400 hover:bg-gray-100 hover:text-gray-900 transition-colors"
             >
-              View details
               <ChevronRight className="w-4 h-4" />
             </NavLink>
           </Card>
@@ -266,8 +281,8 @@ export function DashboardPage() {
                     x2="0"
                     y2="1"
                   >
-                    <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                    <stop offset="5%" stopColor="#111827" stopOpacity={0.25} />
+                    <stop offset="95%" stopColor="#111827" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
@@ -298,7 +313,7 @@ export function DashboardPage() {
                 <Area
                   type="monotone"
                   dataKey="count"
-                  stroke="#6366f1"
+                  stroke="#111827"
                   strokeWidth={2}
                   fillOpacity={1}
                   fill="url(#clientGrowthColor)"
@@ -403,13 +418,13 @@ export function DashboardPage() {
                 <Legend />
                 <Bar
                   dataKey="totalValue"
-                  fill="#6366f1"
+                  fill="#111827"
                   radius={[4, 4, 0, 0]}
                   name="Total Value"
                 />
                 <Bar
                   dataKey="weightedValue"
-                  fill="#059669"
+                  fill="#9ca3af"
                   radius={[4, 4, 0, 0]}
                   name="Weighted Value"
                 />
@@ -456,9 +471,9 @@ export function DashboardPage() {
                 <Line
                   type="monotone"
                   dataKey="revenue"
-                  stroke="#6366f1"
+                  stroke="#111827"
                   strokeWidth={3}
-                  dot={{ fill: "#6366f1", strokeWidth: 2, r: 4 }}
+                  dot={{ fill: "#111827", strokeWidth: 2, r: 4 }}
                   activeDot={{ r: 6 }}
                   name="Revenue"
                 />

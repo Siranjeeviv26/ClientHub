@@ -11,6 +11,13 @@ import { Lead, LeadSchema } from '../leads/schemas/lead.schema';
 import { Deal, DealSchema } from '../deals/schemas/deal.schema';
 import { Task, TaskSchema } from '../tasks/schemas/task.schema';
 import { Activity, ActivitySchema } from '../activities/schemas/activity.schema';
+import { Plan, PlanSchema } from '../plans/schemas/plan.schema';
+import { Proposal, ProposalSchema } from '../proposals/schemas/proposal.schema';
+import { Invoice, InvoiceSchema } from '../invoices/schemas/invoice.schema';
+import { Payment, PaymentSchema } from '../payments/schemas/payment.schema';
+import { Communication, CommunicationSchema } from '../communications/schemas/communication.schema';
+import { CalendarEvent, EventSchema } from '../events/schemas/event.schema';
+import { Documents, DocumentsSchema } from '../documents/schemas/document.schema';
 
 @Module({
   imports: [
@@ -23,6 +30,13 @@ import { Activity, ActivitySchema } from '../activities/schemas/activity.schema'
       { name: Deal.name, schema: DealSchema },
       { name: Task.name, schema: TaskSchema },
       { name: Activity.name, schema: ActivitySchema },
+      { name: Plan.name, schema: PlanSchema },
+      { name: Proposal.name, schema: ProposalSchema },
+      { name: Invoice.name, schema: InvoiceSchema },
+      { name: Payment.name, schema: PaymentSchema },
+      { name: Communication.name, schema: CommunicationSchema },
+      { name: CalendarEvent.name, schema: EventSchema },
+      { name: Documents.name, schema: DocumentsSchema },
     ]),
   ],
   controllers: [SeedController],

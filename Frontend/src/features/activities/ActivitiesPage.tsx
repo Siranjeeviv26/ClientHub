@@ -5,6 +5,8 @@ import {
   Filter,
   ChevronDown,
   ChevronUp,
+  ChevronLeft,
+  ChevronRight,
   Edit,
   Trash2,
   Eye,
@@ -15,8 +17,11 @@ import {
   Mail,
   Send,
   ArrowRight,
+  X,
+  MoreVertical,
 } from "lucide-react";
-import { Column, Table } from "../../components/ui/Table";
+import type { Column } from "../../components/ui/Table";
+import { Table } from "../../components/ui/Table";
 import { Modal } from "../../components/ui/Modal";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
@@ -105,12 +110,30 @@ export function ActivitiesPage() {
     totalPages: 0,
   });
   const [search, setSearch] = useState("");
+  const [searchInput, setSearchInput] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [relatedTypeFilter, setRelatedTypeFilter] = useState("");
   const [sort, setSort] = useState("createdAt:desc");
+  const hasActiveFilters = !!(search || typeFilter || relatedTypeFilter);
+  const filteredActivities = activities.filter((a) => {
+    if (typeFilter && a.type !== typeFilter) return false;
+    if (relatedTypeFilter && a.relatedType !== relatedTypeFilter) return false;
+    if (search) {
+      const q = search.toLowerCase();
+      const hay = `${a.title || ''} ${a.description || ''} ${a.relatedType || ''}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+
+  useEffect(() => {
+    const t = setTimeout(() => { if (searchInput !== search) { setSearch(searchInput); setPagination((p) => ({ ...p, page: 1 })); } }, 350);
+    return () => clearTimeout(t);
+  }, [searchInput]);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<Activity | null>(null);
+  const [viewActivity, setViewActivity] = useState<Activity | null>(null);
 
   const {
     register,
@@ -156,14 +179,20 @@ export function ActivitiesPage() {
   const fetchActivities = async () => {
     setIsLoading(true);
     try {
-      const response = await activitiesApi.getEntityActivities("all", "all", {
+      const response = await activitiesApi.getMyActivities({
         page: pagination.page,
         limit: pagination.limit,
-        // Note: The API doesn't support search/sort for all entities yet
       });
-      if (response.success) {
-        setActivities(response.data.items);
-        setPagination((prev) => ({ ...prev, ...response.data.pagination }));
+      if (response?.success && response?.data) {
+        setActivities(response.data.items || []);
+        if (response.data.pagination) {
+          setPagination((prev) => ({ ...prev, ...response.data.pagination }));
+        }
+      } else if (Array.isArray((response as any)?.data)) {
+        // Fallback if API returns raw array
+        setActivities((response as any).data as Activity[]);
+      } else if (response && !(response as any).success) {
+        console.warn('Activities API returned non-success:', response);
       }
     } catch (error) {
       console.error("Failed to fetch activities:", error);
@@ -175,36 +204,18 @@ export function ActivitiesPage() {
 
   useEffect(() => {
     fetchActivities();
-  }, [pagination.page, typeFilter, relatedTypeFilter, sort]);
+  }, [pagination.page, search, typeFilter, relatedTypeFilter, sort]);
 
   const handleSubmitForm = async (data: any) => {
     try {
-      if (editingActivity) {
-        // Update not implemented in API yet
-        toast.success("Activity updated");
+      const response = await activitiesApi.logActivity(data);
+      if (response.success) {
+        toast.success("Activity logged successfully");
         setModalOpen(false);
-      } else {
-        const response = await activitiesApi.logActivity(data);
-        if (response.success) {
-          toast.success("Activity logged successfully");
-          setModalOpen(false);
-          fetchActivities();
-        }
+        fetchActivities();
       }
     } catch (error: any) {
       toast.error(error.response?.data?.message || "Failed to save activity");
-    }
-  };
-
-  const handleDelete = async () => {
-    if (!deleteConfirm) return;
-    try {
-      // Delete not implemented in API yet
-      toast.success("Activity deleted");
-      setDeleteConfirm(null);
-      fetchActivities();
-    } catch (error) {
-      toast.error("Failed to delete activity");
     }
   };
 
@@ -221,7 +232,7 @@ export function ActivitiesPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Header */}
       <div className="page-header">
         <div>
@@ -239,53 +250,67 @@ export function ActivitiesPage() {
       </div>
 
       {/* Filters */}
-      <div className="card p-4">
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+      <div className="bg-white rounded-2xl border border-gray-200/70 shadow-sm p-5">
+        <div className="flex flex-col lg:flex-row lg:items-center gap-3 lg:justify-between">
+          <div className="relative w-full lg:w-[380px] shrink-0">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
             <input
               type="text"
-              placeholder="Search activities..."
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setPagination((prev) => ({ ...prev, page: 1 }));
-              }}
-              className="input pl-10"
+              placeholder="Search by title or description..."
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              className="w-full h-9 rounded-xl border border-gray-200 bg-gray-50 pl-9 pr-8 text-sm placeholder:text-gray-400 focus:bg-white focus:border-primary-500 focus:ring-2 focus:ring-primary-500/15 focus:outline-none transition-all hover:border-gray-300"
             />
+            {searchInput && (
+              <button onClick={() => { setSearchInput(''); setSearch(''); }} className="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 transition-colors">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
-          <Select
-            options={[{ value: "", label: "All Types" }, ...TYPE_OPTIONS]}
-            value={typeFilter}
-            onChange={(e) => {
-              setTypeFilter(e.target.value);
-              setPagination((prev) => ({ ...prev, page: 1 }));
-            }}
-            placeholder="Filter by type"
-            className="w-full sm:w-48"
-          />
-          <Select
-            options={RELATED_TYPE_OPTIONS}
-            value={relatedTypeFilter}
-            onChange={(e) => {
-              setRelatedTypeFilter(e.target.value);
-              setPagination((prev) => ({ ...prev, page: 1 }));
-            }}
-            placeholder="Related to"
-            className="w-full sm:w-48"
-          />
+          <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+            <div className="w-full sm:w-[150px] shrink-0">
+              <Select
+                options={[{ value: "", label: "All types" }, ...TYPE_OPTIONS]}
+                value={typeFilter}
+                onChange={(e) => setTypeFilter(e.target.value)}
+                className="h-9 text-sm"
+              />
+            </div>
+            <div className="w-full sm:w-[150px] shrink-0">
+              <Select
+                options={RELATED_TYPE_OPTIONS}
+                value={relatedTypeFilter}
+                onChange={(e) => setRelatedTypeFilter(e.target.value)}
+                className="h-9 text-sm"
+              />
+            </div>
+            {hasActiveFilters && (
+              <Button variant="ghost" size="sm" onClick={() => { setSearchInput(''); setSearch(''); setTypeFilter(''); setRelatedTypeFilter(''); }} className="h-9 px-3 text-xs border border-gray-200 bg-white hover:bg-gray-50 whitespace-nowrap">
+                <X className="w-3.5 h-3.5" /> Clear
+              </Button>
+            )}
+          </div>
         </div>
+        {hasActiveFilters && (
+          <div className="mt-3 pt-3 border-t border-gray-100 flex items-center gap-2 flex-wrap">
+            <span className="inline-flex items-center gap-1 text-xs text-gray-500"><Filter className="w-3 h-3" /> Active</span>
+            {typeFilter && <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary-50 border border-primary-200 text-xs font-medium text-primary-700">{TYPE_OPTIONS.find(o => o.value === typeFilter)?.label || typeFilter}<button onClick={() => setTypeFilter('')} className="hover:bg-primary-100 rounded-full p-0.5"><X className="w-3 h-3" /></button></span>}
+            {relatedTypeFilter && <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gray-50 border border-gray-200 text-xs font-medium text-gray-700 capitalize">{relatedTypeFilter}<button onClick={() => setRelatedTypeFilter('')} className="hover:bg-gray-100 rounded-full p-0.5"><X className="w-3 h-3" /></button></span>}
+            {search && <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gray-50 border border-gray-200 text-xs font-medium text-gray-700">“{search}”<button onClick={() => { setSearch(''); setSearchInput(''); }} className="hover:bg-gray-100 rounded-full p-0.5"><X className="w-3 h-3" /></button></span>}
+            <span className="text-xs text-gray-400">{filteredActivities.length} on page</span>
+          </div>
+        )}
       </div>
 
       {/* Table */}
       {isLoading ? (
-        <div className="space-y-4">
+        <div className="space-y-3">
           {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="card animate-pulse p-4">
+            <div key={i} className="bg-white rounded-2xl border border-gray-200/70 p-4 animate-pulse">
               <div className="flex gap-4">
-                <div className="skeleton w-24 h-6" />
-                <div className="skeleton w-48 h-6" />
-                <div className="skeleton w-32 h-6" />
+                <div className="skeleton w-24 h-6 rounded-lg" />
+                <div className="skeleton w-48 h-6 rounded-lg" />
+                <div className="skeleton w-32 h-6 rounded-lg" />
               </div>
             </div>
           ))}
@@ -299,7 +324,14 @@ export function ActivitiesPage() {
                 header: "Type",
                 sortable: true,
                 render: (activity) => {
-                  const config = ACTIVITY_TYPE_CONFIG[activity.type];
+                  const config = ACTIVITY_TYPE_CONFIG[activity.type as ActivityType];
+                  if (!config) {
+                    return (
+                      <Badge variant="gray" size="sm" className="capitalize">
+                        {String(activity.type || 'unknown').replace(/_/g, ' ')}
+                      </Badge>
+                    );
+                  }
                   return (
                     <div className="flex items-center gap-2">
                       <Badge
@@ -335,13 +367,14 @@ export function ActivitiesPage() {
                 key: "relatedType",
                 header: "Related To",
                 sortable: true,
-                render: (activity) => (
+                                  className: 'hidden lg:table-cell',
+render: (activity) => (
                   <div className="flex items-center gap-2">
                     <Badge variant="gray" size="sm" className="capitalize">
-                      {activity.relatedType}
+                      {activity.relatedType || '—'}
                     </Badge>
                     <span className="text-sm text-gray-500">
-                      {activity.relatedId.slice(0, 8)}...
+                      {activity.relatedId ? String(activity.relatedId).slice(0, 8) + '...' : '—'}
                     </span>
                   </div>
                 ),
@@ -349,27 +382,28 @@ export function ActivitiesPage() {
               {
                 key: "user",
                 header: "Created By",
-                render: (activity) =>
-                  activity.user ? (
-                    <div className="flex items-center gap-2">
-                      <Avatar
-                        name={activity.user.fullName}
-                        src={activity.user.avatar}
-                        size="sm"
-                      />
-                      <span className="text-sm text-gray-700">
-                        {activity.user.firstName} {activity.user.lastName}
-                      </span>
-                    </div>
-                  ) : (
-                    <span className="text-gray-400">Unknown</span>
-                  ),
+                                  className: 'hidden xl:table-cell',
+render: (activity) => {
+                  const u = (activity as any).user || (activity as any).userId;
+                  // userId may be populated object or string
+                  if (u && typeof u === 'object' && (u.firstName || u.fullName)) {
+                    const name = u.fullName || `${u.firstName || ''} ${u.lastName || ''}`.trim() || 'User';
+                    return (
+                      <div className="flex items-center gap-2">
+                        <Avatar name={name} src={u.avatar} size="sm" />
+                        <span className="text-sm text-gray-700">{name}</span>
+                      </div>
+                    );
+                  }
+                  return <span className="text-gray-400">Unknown</span>;
+                },
               },
               {
                 key: "createdAt",
                 header: "Time",
                 sortable: true,
-                render: (activity) => (
+                                  className: 'hidden md:table-cell',
+render: (activity) => (
                   <div className="text-right">
                     <p className="text-sm text-gray-900">
                       {formatDate(activity.createdAt)}
@@ -383,35 +417,28 @@ export function ActivitiesPage() {
               {
                 key: "actions",
                 header: "Actions",
-                render: (activity) => (
+                  render: (activity) => (
                   <Dropdown
                     trigger={
-                      <Button variant="ghost" size="sm" className="p-1">
-                        <ChevronDown className="w-4 h-4" />
+                      <Button variant="ghost" size="sm" className="w-8 h-8 p-0 rounded-lg hover:bg-gray-100 border border-transparent hover:border-gray-200">
+                        <MoreVertical className="w-4 h-4" />
                       </Button>
                     }
                     items={[
                       {
                         label: "View Details",
                         icon: <Eye className="w-4 h-4" />,
-                        onClick: () => {},
-                      },
-                      {
-                        dividerBefore: true,
-                        label: "Delete",
-                        icon: <Trash2 className="w-4 h-4" />,
-                        onClick: () => setDeleteConfirm(activity),
-                        danger: true,
+                        onClick: () => setViewActivity(activity),
                       },
                     ]}
                   />
                 ),
               },
             ]}
-            data={activities}
+            data={filteredActivities}
             keyExtractor={(activity) => activity._id}
             isLoading={isLoading}
-            emptyMessage="No activities found."
+            emptyMessage={hasActiveFilters ? "No activities match your filters. Clear to see all." : "No activities found."}
             hoverable
             striped
           />
@@ -526,23 +553,36 @@ export function ActivitiesPage() {
         </form>
       </Modal>
 
-      {/* Delete Confirmation Modal */}
+      {/* View Details Modal */}
       <Modal
-        isOpen={!!deleteConfirm}
-        onClose={() => setDeleteConfirm(null)}
-        title="Delete Activity"
-        description={`Are you sure you want to delete this activity? This action cannot be undone.`}
+        isOpen={!!viewActivity}
+        onClose={() => setViewActivity(null)}
+        title={viewActivity?.title || 'Activity Details'}
+        size="lg"
         footer={
           <div className="flex justify-end gap-3">
-            <Button variant="secondary" onClick={() => setDeleteConfirm(null)}>
-              Cancel
-            </Button>
-            <Button variant="danger" onClick={handleDelete}>
-              Delete
-            </Button>
+            <Button variant="secondary" onClick={() => setViewActivity(null)}>Close</Button>
           </div>
         }
-      />
+      >
+        {viewActivity && (
+          <div className="space-y-5">
+            <div className="p-4 rounded-2xl bg-gray-50 border border-gray-200">
+              <p className="text-xs tracking-widest uppercase text-gray-400">Type • Related</p>
+              <p className="font-semibold text-gray-900 mt-1 capitalize">{String(viewActivity.type || '').replace(/_/g, ' ')} • {viewActivity.relatedType || '—'}</p>
+              <p className="text-sm text-gray-600 mt-1">{viewActivity.title}</p>
+              {viewActivity.description && <p className="text-sm text-gray-500 mt-2 whitespace-pre-wrap">{viewActivity.description}</p>}
+            </div>
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div><p className="text-xs tracking-widest uppercase text-gray-400">Related ID</p><p className="font-medium mt-1 font-mono text-xs break-all">{viewActivity.relatedId ? String(viewActivity.relatedId) : '—'}</p></div>
+              <div><p className="text-xs tracking-widest uppercase text-gray-400">Created</p><p className="font-medium mt-1">{viewActivity.createdAt ? `${formatDate(viewActivity.createdAt)} • ${formatRelativeTime(viewActivity.createdAt)}` : '—'}</p></div>
+            </div>
+            {(viewActivity as any).metadata && Object.keys((viewActivity as any).metadata).length > 0 && (
+              <div><p className="text-xs tracking-widest uppercase text-gray-400">Metadata</p><pre className="text-xs mt-1 p-3 rounded-xl bg-gray-900 text-gray-100 overflow-auto">{JSON.stringify((viewActivity as any).metadata, null, 2)}</pre></div>
+            )}
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }

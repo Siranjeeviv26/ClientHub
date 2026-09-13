@@ -21,12 +21,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   const loadStoredAuth = useCallback(async () => {
-    const storedUser = localStorage.getItem('user');
+    let storedUser = null;
+    try {
+      const raw = localStorage.getItem('user');
+      if (raw) storedUser = JSON.parse(raw);
+    } catch { /* corrupted storage */ }
     const accessToken = localStorage.getItem('accessToken');
 
     if (storedUser && accessToken) {
       try {
-        setUser(JSON.parse(storedUser));
+        setUser(storedUser);
         // Verify token is still valid by fetching profile
         await refreshUser();
         window.dispatchEvent(new Event('auth:login'));

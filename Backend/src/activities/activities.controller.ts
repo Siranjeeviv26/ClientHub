@@ -13,6 +13,7 @@ import { ActivityService } from './activities.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
+import { Permissions } from '../common/decorators/permissions.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { CurrentOrg } from '../common/decorators/current-org.decorator';
 import { ActivityType } from './schemas/activity.schema';
@@ -25,6 +26,7 @@ export class ActivitiesController {
   constructor(private activityService: ActivityService) {}
 
   @Get()
+  @Permissions('activities:read')
   @ApiOperation({ summary: 'Get recent activities across organization' })
   @ApiQuery({ name: 'limit', required: false })
   @ApiResponse({ status: 200, description: 'Recent activities' })
@@ -36,6 +38,7 @@ export class ActivitiesController {
   }
 
   @Get('my')
+  @Permissions('activities:read')
   @ApiOperation({ summary: 'Get current user activities' })
   @ApiQuery({ name: 'page', required: false })
   @ApiQuery({ name: 'limit', required: false })
@@ -50,6 +53,7 @@ export class ActivitiesController {
   }
 
   @Get(':relatedType/:relatedId')
+  @Permissions('activities:read')
   @ApiOperation({ summary: 'Get activities for a specific entity' })
   @ApiQuery({ name: 'page', required: false })
   @ApiQuery({ name: 'limit', required: false })
@@ -71,6 +75,7 @@ export class ActivitiesController {
   }
 
   @Post()
+  @Permissions('activities:create')
   @ApiOperation({ summary: 'Log a new activity' })
   @ApiResponse({ status: 201, description: 'Activity logged' })
   async logActivity(

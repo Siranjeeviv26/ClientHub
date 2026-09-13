@@ -1,4 +1,5 @@
 import axios, { AxiosInstance, InternalAxiosRequestConfig, AxiosError } from 'axios';
+import toast from 'react-hot-toast';
 import { AuthTokens, ApiError, User, Organization, OrganizationMember, OrganizationInvitation, Client, Lead, Deal, Task, Activity, Notification, DashboardStats, ClientGrowthData, LeadConversionData, PipelineData, RevenueData, UpcomingFollowUp } from '../types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api/v1';
@@ -55,6 +56,10 @@ class ApiService {
           }
         }
 
+        if (error.response?.status === 403) {
+          toast.error('You do not have permission to perform this action');
+        }
+
         return Promise.reject(error);
       },
     );
@@ -98,11 +103,19 @@ class ApiService {
   }
 
   private unwrapResponse<T>(response: any): { success: boolean; data: T; message?: string } {
-    const data = response.data;
-    if (data && typeof data === 'object' && 'success' in data) {
-      return data as { success: boolean; data: T; message?: string };
+    const body = response.data;
+
+    // Already in our format: { success: true, data: T }
+    if (body && typeof body === 'object' && 'success' in body) {
+      return body as { success: boolean; data: T; message?: string };
     }
-    return { success: true, data: data as T };
+
+    // NestJS format: { data: T } — unwrap it
+    if (body && typeof body === 'object' && 'data' in body && !Array.isArray(body)) {
+      return { success: true, data: body.data as T, message: body.message };
+    }
+
+    return { success: true, data: body as T };
   }
 
   async get<T>(url: string, params?: Record<string, any>) {
@@ -110,23 +123,26 @@ class ApiService {
     return this.unwrapResponse(response);
   }
 
-  async post<T>(url: string, data?: any) {
-    const response = await this.client.post(url, data);
+  async post<T>(url: string, data?: any, config?: any) {
+    const response = await this.client.post(url, data, config);
     return this.unwrapResponse(response);
   }
 
-  async patch<T>(url: string, data?: any) {
-    const response = await this.client.patch(url, data);
+  async patch<T>(url: string, data?: any, config?: any) {
+    const response = await this.client.patch(url, data, config);
     return this.unwrapResponse(response);
   }
 
-  async put<T>(url: string, data?: any) {
-    const response = await this.client.put(url, data);
+  async put<T>(url: string, data?: any, config?: any) {
+    const response = await this.client.put(url, data, config);
     return this.unwrapResponse(response);
   }
 
   async delete<T>(url: string) {
     const response = await this.client.delete(url);
+    if (response.status === 204 || !response.data) {
+      return { success: true, data: null as T };
+    }
     return this.unwrapResponse(response);
   }
 

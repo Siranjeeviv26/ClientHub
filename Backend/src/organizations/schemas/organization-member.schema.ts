@@ -18,8 +18,8 @@ export class OrganizationMember {
   @Prop({ type: Types.ObjectId, ref: 'Organization', required: true, index: true })
   organizationId: Types.ObjectId;
 
-  @Prop({ type: String, enum: Role, required: true })
-  role: Role;
+  @Prop({ type: String, required: true })
+  role: string;
 
   @Prop({ type: String, enum: MemberStatus, default: MemberStatus.INVITED, index: true })
   status: MemberStatus;

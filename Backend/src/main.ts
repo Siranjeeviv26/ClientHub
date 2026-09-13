@@ -1,12 +1,11 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe as NestValidationPipe } from '@nestjs/common';
+import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
-import { ValidationPipe } from './common/pipes/validation.pipe';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -25,14 +24,13 @@ async function bootstrap() {
 
   // Global pipes
   app.useGlobalPipes(
-    new NestValidationPipe({
+    new ValidationPipe({
       whitelist: true,
       forbidNonWhitelisted: true,
       transform: true,
       transformOptions: { enableImplicitConversion: true },
     }),
   );
-  app.useGlobalPipes(new ValidationPipe());
 
   // Global filters
   app.useGlobalFilters(new HttpExceptionFilter());

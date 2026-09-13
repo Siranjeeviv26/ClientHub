@@ -19,6 +19,7 @@ import { UpdateLeadDto } from './dto/update-lead.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
+import { Permissions } from '../common/decorators/permissions.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { CurrentOrg } from '../common/decorators/current-org.decorator';
 
@@ -30,6 +31,7 @@ export class LeadsController {
   constructor(private leadsService: LeadsService) {}
 
   @Get()
+  @Permissions('leads:read')
   @ApiOperation({ summary: 'Get all leads with pagination, search, and filters' })
   @ApiQuery({ name: 'page', required: false })
   @ApiQuery({ name: 'limit', required: false })
@@ -67,6 +69,7 @@ export class LeadsController {
   }
 
   @Get('pipeline')
+  @Permissions('leads:read')
   @ApiOperation({ summary: 'Get leads pipeline (Kanban view)' })
   @ApiResponse({ status: 200, description: 'Pipeline grouped by stage' })
   async getPipeline(@CurrentOrg() organizationId: string) {
@@ -74,6 +77,7 @@ export class LeadsController {
   }
 
   @Get(':id')
+  @Permissions('leads:read')
   @ApiOperation({ summary: 'Get lead by ID' })
   @ApiResponse({ status: 200, description: 'Lead details' })
   @ApiResponse({ status: 404, description: 'Lead not found' })
@@ -85,6 +89,7 @@ export class LeadsController {
   }
 
   @Post()
+  @Permissions('leads:create')
   @ApiOperation({ summary: 'Create a new lead' })
   @ApiResponse({ status: 201, description: 'Lead created' })
   async create(
@@ -96,6 +101,7 @@ export class LeadsController {
   }
 
   @Patch(':id')
+  @Permissions('leads:update')
   @ApiOperation({ summary: 'Update lead' })
   @ApiResponse({ status: 200, description: 'Lead updated' })
   async update(
@@ -108,6 +114,7 @@ export class LeadsController {
   }
 
   @Post(':id/convert')
+  @Permissions('leads:convert')
   @ApiOperation({ summary: 'Convert lead to client' })
   @ApiResponse({ status: 200, description: 'Lead converted to client' })
   async convert(
@@ -119,6 +126,7 @@ export class LeadsController {
   }
 
   @Delete(':id')
+  @Permissions('leads:delete')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete lead' })
   @ApiResponse({ status: 204, description: 'Lead deleted' })
@@ -130,6 +138,7 @@ export class LeadsController {
   }
 
   @Get(':id/activities')
+  @Permissions('leads:read', 'activities:read')
   @ApiOperation({ summary: 'Get lead activities' })
   @ApiQuery({ name: 'page', required: false })
   @ApiQuery({ name: 'limit', required: false })

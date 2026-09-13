@@ -18,8 +18,9 @@ import { CreateOrganizationDto } from './dto/create-organization.dto';
 import { UpdateOrganizationDto } from './dto/update-organization.dto';
 import { InviteMemberDto } from './dto/invite-member.dto';
 import { EmailService } from '../email/email.service';
-import { Role, RolePermissions, hasPermission } from '../roles/role-permissions.enum';
+import { Role, RolePermissions, hasPermission, isRoleHigherOrEqual } from '../roles/role-permissions.enum';
 import { User, UserDocument } from '../auth/schemas/user.schema';
+import { StorageService } from '../storage/storage.service';
 
 @Injectable()
 export class OrganizationsService {
@@ -32,6 +33,7 @@ export class OrganizationsService {
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     private configService: ConfigService,
     private emailService: EmailService,
+    private storageService: StorageService,
   ) {}
 
   async create(userId: string, dto: CreateOrganizationDto): Promise<OrganizationDocument> {
@@ -44,6 +46,7 @@ export class OrganizationsService {
     const organization = await this.organizationModel.create({
       name: dto.name,
       slug,
+      ...(dto.maxMembers !== undefined ? { maxMembers: dto.maxMembers } : {}),
       settings: {
         timezone: 'UTC',
         dateFormat: 'YYYY-MM-DD',
@@ -87,6 +90,19 @@ export class OrganizationsService {
     return organization;
   }
 
+  async findByIdAndCheckMembership(organizationId: string, userId: string): Promise<OrganizationDocument> {
+    const organization = await this.findById(organizationId);
+    const membership = await this.memberModel.findOne({
+      organizationId: new Types.ObjectId(organizationId),
+      userId: new Types.ObjectId(userId),
+      status: 'ACTIVE',
+    });
+    if (!membership) {
+      throw new ForbiddenException('Not a member of this organization');
+    }
+    return organization;
+  }
+
   async findBySlug(slug: string): Promise<OrganizationDocument> {
     const organization = await this.organizationModel.findOne({ slug });
     if (!organization) {
@@ -99,6 +115,10 @@ export class OrganizationsService {
     await this.checkPermission(organizationId, userId, 'organization:update');
 
     const organization = await this.findById(organizationId);
+
+    if (dto.maxMembers !== undefined) {
+      organization.maxMembers = dto.maxMembers;
+    }
 
     if (dto.name) organization.name = dto.name;
     if (dto.slug) {
@@ -160,6 +180,7 @@ export class OrganizationsService {
 
   async inviteMember(organizationId: string, userId: string, dto: InviteMemberDto): Promise<OrganizationInvitationDocument> {
     await this.checkPermission(organizationId, userId, 'members:invite');
+    await this.checkMemberLimit(organizationId);
 
     // Check if already a member
     const existingMembers = await this.memberModel.find({
@@ -222,6 +243,8 @@ export class OrganizationsService {
       throw new ConflictException('Already a member of this organization');
     }
 
+    await this.checkMemberLimit(invitation.organizationId.toString());
+
     // Create membership
     await this.memberModel.create({
       userId: new Types.ObjectId(userId),
@@ -249,6 +272,15 @@ export class OrganizationsService {
 
   async updateMember(organizationId: string, userId: string, targetUserId: string, role: Role): Promise<OrganizationMemberDocument> {
     await this.checkPermission(organizationId, userId, 'members:role:assign');
+
+    // Get caller's role to enforce hierarchy
+    const callerMember = await this.memberModel.findOne({
+      organizationId: new Types.ObjectId(organizationId),
+      userId: new Types.ObjectId(userId),
+    });
+    if (callerMember && !isRoleHigherOrEqual(callerMember.role, role)) {
+      throw new ForbiddenException('Cannot assign a role higher than your own');
+    }
 
     // Prevent self-demotion from admin if only admin
     if (targetUserId === userId) {
@@ -356,15 +388,19 @@ export class OrganizationsService {
 
     // Delete old logo if exists
     if (organization.logo) {
-      // Would use storage service here
+      await this.storageService.deleteByUrl(organization.logo);
     }
 
-    // Upload new logo - placeholder for now
-    const logoUrl = `/uploads/organizations/${organizationId}/logo-${Date.now()}${this.getExtension(file.originalname)}`;
-    organization.logo = logoUrl;
+    // Upload new logo to Cloudinary
+    const result = await this.storageService.upload(file, {
+      folder: `clienthub/organizations/${organizationId}/logo`,
+      transformation: [{ width: 256, height: 256, crop: 'fill', gravity: 'auto' }],
+    });
+
+    organization.logo = result.url;
     await organization.save();
 
-    return { logo: logoUrl };
+    return { logo: result.url };
   }
 
   async deleteLogo(organizationId: string, userId: string): Promise<void> {
@@ -372,7 +408,7 @@ export class OrganizationsService {
 
     const organization = await this.findById(organizationId);
     if (organization.logo) {
-      // Would use storage service here
+      await this.storageService.deleteByUrl(organization.logo);
       organization.logo = undefined;
       await organization.save();
     }
@@ -382,6 +418,30 @@ export class OrganizationsService {
     await this.checkPermission(organizationId, userId, 'organization:settings:read');
     const organization = await this.findById(organizationId);
     return organization.settings;
+  }
+
+  /**
+   * Enforces the vendor-set member limit: ACTIVE members + PENDING
+   * invitations must stay below organization.maxMembers (when set).
+   */
+  private async checkMemberLimit(organizationId: string): Promise<void> {
+    const organization = await this.findById(organizationId);
+    if (!organization.maxMembers) return;
+    const [memberCount, pendingCount] = await Promise.all([
+      this.memberModel.countDocuments({
+        organizationId: new Types.ObjectId(organizationId),
+        status: 'ACTIVE',
+      }),
+      this.invitationModel.countDocuments({
+        organizationId: new Types.ObjectId(organizationId),
+        status: 'PENDING',
+      }),
+    ]);
+    if (memberCount + pendingCount >= organization.maxMembers) {
+      throw new ForbiddenException(
+        `Member limit reached for this organization (max ${organization.maxMembers}).`,
+      );
+    }
   }
 
   private async checkPermission(organizationId: string, userId: string, permission: string): Promise<void> {
@@ -407,10 +467,5 @@ export class OrganizationsService {
       .replace(/\s+/g, '-')
       .replace(/-+/g, '-')
       .substring(0, 50);
-  }
-
-  private getExtension(filename: string): string {
-    const parts = filename.split('.');
-    return parts.length > 1 ? '.' + parts.pop() : '';
   }
 }

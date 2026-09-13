@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   Plus,
   Search,
   Filter,
   ChevronDown,
   ChevronUp,
+  ChevronLeft,
+  ChevronRight,
   Edit,
   Trash2,
   Eye,
@@ -14,6 +15,8 @@ import {
   Phone,
   MapPin,
   Tag,
+  X,
+  MoreVertical,
 } from 'lucide-react';
 import { Column, Table } from '../../components/ui/Table';
 import { Modal } from '../../components/ui/Modal';
@@ -25,8 +28,10 @@ import { Avatar } from '../../components/ui/Avatar';
 import { Dropdown, DropdownItem } from '../../components/ui/Dropdown';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { clientsApi } from '../../api/clients';
+import { usersApi } from '../../api/users';
 import { Client, Contact } from '../../types';
 import { formatDate, getStatusColor, cn } from '../../utils/formatters';
+import { useAuth } from '../../contexts/AuthContext';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -37,6 +42,7 @@ const clientSchema = z.object({
   website: z.string().url('Please enter a valid URL').optional().or(z.literal('')),
   industry: z.string().optional(),
   size: z.string().optional(),
+  assignedTo: z.string().optional(),
   address: z.string().optional(),
   city: z.string().optional(),
   state: z.string().optional(),
@@ -75,17 +81,22 @@ const SIZE_OPTIONS = [
 ];
 
 export function ClientsPage() {
-  const navigate = useNavigate();
+  const { user: currentUser } = useAuth();
+  const canCreate = currentUser?.role === 'ADMIN' || currentUser?.role === 'MANAGER' || currentUser?.role === 'SALES';
+  const canDelete = currentUser?.role === 'ADMIN';
   const [clients, setClients] = useState<Client[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 0 });
   const [search, setSearch] = useState('');
+  const [searchInput, setSearchInput] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [sort, setSort] = useState('createdAt:desc');
   const [modalOpen, setModalOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<Client | null>(null);
+  const [viewClient, setViewClient] = useState<Client | null>(null);
   const [contactRows, setContactRows] = useState<Contact[]>([{ firstName: '', lastName: '', email: '', phone: '', position: '', isPrimary: true }]);
+  const [dropdownUsers, setDropdownUsers] = useState<{ _id: string; firstName: string; lastName: string }[]>([]);
 
   const {
     register,
@@ -101,6 +112,7 @@ export function ClientsPage() {
       website: '',
       industry: '',
       size: '',
+      assignedTo: '',
       address: '',
       city: '',
       state: '',
@@ -112,6 +124,15 @@ export function ClientsPage() {
       contacts: [{ firstName: '', lastName: '', email: '', phone: '', position: '', isPrimary: true }],
     },
   });
+
+  const fetchDropdownUsers = async () => {
+    try {
+      const res = await usersApi.findAll({ limit: 100 });
+      if ((res as any)?.success && (res as any)?.data?.items) {
+        setDropdownUsers((res as any).data.items.filter((u: any) => u.role !== 'ADMIN').map((u: any) => ({ _id: u._id, firstName: u.firstName, lastName: u.lastName })));
+      }
+    } catch { /* non-critical */ }
+  };
 
   const fetchClients = async () => {
     setIsLoading(true);
@@ -134,6 +155,11 @@ export function ClientsPage() {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    const t = setTimeout(() => setSearch(searchInput), 300);
+    return () => clearTimeout(t);
+  }, [searchInput]);
 
   useEffect(() => {
     fetchClients();
@@ -175,11 +201,13 @@ export function ClientsPage() {
 
   const openCreateModal = () => {
     setEditingClient(null);
+    fetchDropdownUsers();
     reset({
       companyName: '',
       website: '',
       industry: '',
       size: '',
+      assignedTo: '',
       address: '',
       city: '',
       state: '',
@@ -196,12 +224,14 @@ export function ClientsPage() {
 
   const openEditModal = (client: Client) => {
     setEditingClient(client);
+    fetchDropdownUsers();
     setContactRows(client.contacts);
     reset({
       companyName: client.companyName,
       website: client.website || '',
       industry: client.industry || '',
       size: client.size || '',
+      assignedTo: (client.assignedTo as any)?._id || client.assignedTo || '',
       address: client.address || '',
       city: client.city || '',
       state: client.state || '',
@@ -257,18 +287,21 @@ export function ClientsPage() {
     {
       key: 'industry',
       header: 'Industry',
+                  className: 'hidden lg:table-cell',
       sortable: true,
       render: (client) => client.industry || <span className="text-gray-400">—</span>,
     },
     {
       key: 'size',
       header: 'Size',
+                  className: 'hidden lg:table-cell',
       sortable: true,
       render: (client) => client.size || <span className="text-gray-400">—</span>,
     },
     {
       key: 'assignedTo',
       header: 'Assigned To',
+                  className: 'hidden xl:table-cell',
       render: (client) => client.assignedTo ? (
         <Avatar name={`${(client.assignedTo as any).firstName} ${(client.assignedTo as any).lastName}`} src={(client.assignedTo as any).avatar} size="sm" />
       ) : (
@@ -278,6 +311,7 @@ export function ClientsPage() {
     {
       key: 'createdAt',
       header: 'Created',
+                  className: 'hidden lg:table-cell',
       sortable: true,
       render: (client) => formatDate(client.createdAt),
     },
@@ -287,54 +321,89 @@ export function ClientsPage() {
       render: (client) => (
         <Dropdown
           trigger={
-            <Button variant="ghost" size="sm" className="p-1">
-              <ChevronDown className="w-4 h-4" />
+            <Button variant="ghost" size="sm" className="w-8 h-8 p-0 rounded-lg hover:bg-gray-100 border border-transparent hover:border-gray-200">
+              <MoreVertical className="w-4 h-4" />
             </Button>
           }
           items={[
-            { label: 'View', icon: <Eye className="w-4 h-4" />, onClick: () => navigate(`/clients/${client._id}`) },
+            { label: 'View', icon: <Eye className="w-4 h-4" />, onClick: () => setViewClient(client) },
             { label: 'Edit', icon: <Edit className="w-4 h-4" />, onClick: () => openEditModal(client) },
-            { dividerBefore: true, label: 'Delete', icon: <Trash2 className="w-4 h-4" />, onClick: () => setDeleteConfirm(client), danger: true },
-          ]}
+            canDelete && { dividerBefore: true, label: 'Delete', icon: <Trash2 className="w-4 h-4" />, onClick: () => setDeleteConfirm(client), danger: true },
+          ].filter(Boolean) as DropdownItem[]}
         />
       ),
     },
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Header */}
       <div className="page-header">
         <div>
           <h1 className="page-title">Clients</h1>
           <p className="page-description">Manage your client relationships</p>
         </div>
-        <Button onClick={openCreateModal} leftIcon={<Plus className="w-4 h-4" />}>
-          Add Client
-        </Button>
+        {canCreate && (
+          <Button onClick={openCreateModal} leftIcon={<Plus className="w-4 h-4" />}>
+            Add Client
+          </Button>
+        )}
       </div>
 
       {/* Filters */}
-      <div className="card p-4">
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+      <div className="bg-white rounded-2xl border border-gray-200/70 shadow-sm p-5">
+        <div className="flex flex-col lg:flex-row lg:items-center gap-3 lg:justify-between">
+          <div className="relative w-full lg:w-[380px] shrink-0">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
             <input
               type="text"
-              placeholder="Search clients..."
-              value={search}
-              onChange={(e) => { setSearch(e.target.value); setPagination(prev => ({ ...prev, page: 1 })); }}
-              className="input pl-10"
+              placeholder="Search by company, contact or email..."
+              value={searchInput}
+              onChange={(e) => { setSearchInput(e.target.value); setPagination(prev => ({ ...prev, page: 1 })); }}
+              className="w-full h-9 rounded-xl border border-gray-200 bg-gray-50 pl-9 pr-8 text-sm placeholder:text-gray-400 focus:bg-white focus:border-primary-500 focus:ring-2 focus:ring-primary-500/15 focus:outline-none transition-all hover:border-gray-300"
             />
+            {searchInput && (
+              <button onClick={() => { setSearchInput(''); setSearch(''); }} className="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 transition-colors">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
-          <Select
-            options={[{ value: '', label: 'All Statuses' }, ...STATUS_OPTIONS]}
-            value={statusFilter}
-            onChange={(e) => { setStatusFilter(e.target.value); setPagination(prev => ({ ...prev, page: 1 })); }}
-            placeholder="Filter by status"
-            className="w-full sm:w-48"
-          />
+          <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+            <div className="hidden sm:flex items-center gap-1.5 text-xs font-medium text-gray-500">
+              <Filter className="w-3.5 h-3.5" /> Filters
+            </div>
+            <div className="w-full sm:w-[160px] shrink-0">
+              <Select
+                options={[{ value: '', label: 'All statuses' }, ...STATUS_OPTIONS]}
+                value={statusFilter}
+                onChange={(e) => { setStatusFilter(e.target.value); setPagination(prev => ({ ...prev, page: 1 })); }}
+                className="h-9 text-sm"
+              />
+            </div>
+            {(search || statusFilter) && (
+              <Button variant="ghost" size="sm" onClick={() => { setSearchInput(''); setSearch(''); setStatusFilter(''); setPagination(prev => ({ ...prev, page: 1 })); }} className="h-9 px-3 text-xs border border-gray-200 bg-white hover:bg-gray-50">
+                <X className="w-3.5 h-3.5" /> Clear
+              </Button>
+            )}
+          </div>
         </div>
+        {(search || statusFilter) && (
+          <div className="mt-3 flex items-center gap-2 flex-wrap pt-3 border-t border-gray-100">
+            <span className="text-xs text-gray-500">{pagination.total} results</span>
+            {statusFilter && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary-50 border border-primary-200 text-xs font-medium text-primary-700">
+                <span className="w-1.5 h-1.5 rounded-full bg-primary-500" /> {STATUS_OPTIONS.find(o => o.value === statusFilter)?.label}
+                <button onClick={() => setStatusFilter('')} className="ml-1 hover:bg-primary-100 rounded-full p-0.5"><X className="w-3 h-3" /></button>
+              </span>
+            )}
+            {search && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gray-50 border border-gray-200 text-xs font-medium text-gray-700">
+                “{search}”
+                <button onClick={() => { setSearchInput(''); setSearch(''); }} className="ml-1 hover:bg-gray-100 rounded-full p-0.5"><X className="w-3 h-3" /></button>
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Table */}
@@ -433,6 +502,12 @@ export function ClientsPage() {
               error={errors.size?.message}
             />
             <Select
+              label="Assigned To"
+              options={[{ value: '', label: 'Unassigned' }, ...dropdownUsers.map(u => ({ value: u._id, label: `${u.firstName} ${u.lastName}` }))]}
+              value={watch('assignedTo') || ''}
+              onChange={(e) => setValue('assignedTo', e.target.value || undefined)}
+            />
+            <Select
               label="Status *"
               options={STATUS_OPTIONS}
               value={watch('status')}
@@ -525,6 +600,56 @@ export function ClientsPage() {
             />
           </div>
         </form>
+      </Modal>
+
+      {/* View Details Modal */}
+      <Modal
+        isOpen={!!viewClient}
+        onClose={() => setViewClient(null)}
+        title={viewClient?.companyName || 'Client Details'}
+        size="lg"
+        footer={
+          <div className="flex justify-end gap-3">
+            <Button variant="secondary" onClick={() => setViewClient(null)}>Close</Button>
+            <Button onClick={() => { if (viewClient) { setViewClient(null); openEditModal(viewClient); } }} leftIcon={<Edit className="w-4 h-4" />}>Edit</Button>
+          </div>
+        }
+      >
+        {viewClient && (
+          <div className="space-y-5">
+            <div className="flex items-center gap-3 p-4 rounded-2xl bg-gray-50 border border-gray-200">
+              <div className="w-11 h-11 rounded-xl bg-primary-100 text-primary-700 flex items-center justify-center font-semibold">
+                {viewClient.companyName?.slice(0, 2).toUpperCase()}
+              </div>
+              <div className="min-w-0">
+                <p className="font-semibold text-gray-900">{viewClient.companyName}</p>
+                <p className="text-sm text-gray-500">{viewClient.industry || ''}{viewClient.website ? ` • ${viewClient.website}` : ''}</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div><p className="text-xs tracking-widest uppercase text-gray-400">Status</p><p className="font-medium mt-1 capitalize">{viewClient.status}</p></div>
+              <div><p className="text-xs tracking-widest uppercase text-gray-400">Size</p><p className="font-medium mt-1">{viewClient.size || '—'}</p></div>
+              <div><p className="text-xs tracking-widest uppercase text-gray-400">Industry</p><p className="font-medium mt-1">{viewClient.industry || '—'}</p></div>
+              <div><p className="text-xs tracking-widest uppercase text-gray-400">Website</p><p className="font-medium mt-1 truncate">{viewClient.website || '—'}</p></div>
+              <div className="col-span-2"><p className="text-xs tracking-widest uppercase text-gray-400">Address</p><p className="font-medium mt-1">{[viewClient.address, viewClient.city, viewClient.state, viewClient.postalCode, viewClient.country].filter(Boolean).join(', ') || '—'}</p></div>
+              <div><p className="text-xs tracking-widest uppercase text-gray-400">Created</p><p className="font-medium mt-1">{formatDate(viewClient.createdAt)}</p></div>
+            </div>
+            {!!viewClient.contacts?.length && (
+              <div>
+                <p className="text-xs tracking-widest uppercase text-gray-400 mb-2">Contacts ({viewClient.contacts.length})</p>
+                <div className="space-y-2">
+                  {viewClient.contacts.map((c, i) => (
+                    <div key={i} className="p-3 rounded-xl bg-gray-50 border border-gray-200 text-sm">
+                      <p className="font-medium">{c.firstName} {c.lastName}{c.isPrimary ? ' • Primary' : ''}</p>
+                      <p className="text-gray-500">{c.email}{c.phone ? ` • ${c.phone}` : ''}{c.position ? ` • ${c.position}` : ''}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {viewClient.notes && <div><p className="text-xs tracking-widest uppercase text-gray-400">Notes</p><p className="text-sm mt-1 whitespace-pre-wrap">{viewClient.notes}</p></div>}
+          </div>
+        )}
       </Modal>
 
       {/* Delete Confirmation Modal */}

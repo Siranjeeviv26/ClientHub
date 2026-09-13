@@ -19,6 +19,7 @@ import { UpdateDealDto } from './dto/update-deal.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
+import { Permissions } from '../common/decorators/permissions.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { CurrentOrg } from '../common/decorators/current-org.decorator';
 import { DealStage } from './schemas/deal.schema';
@@ -31,6 +32,7 @@ export class DealsController {
   constructor(private dealsService: DealsService) {}
 
   @Get()
+  @Permissions('deals:read')
   @ApiOperation({ summary: 'Get all deals with pagination, search, and filters' })
   @ApiQuery({ name: 'page', required: false })
   @ApiQuery({ name: 'limit', required: false })
@@ -65,6 +67,7 @@ export class DealsController {
   }
 
   @Get('pipeline')
+  @Permissions('deals:read')
   @ApiOperation({ summary: 'Get deals pipeline (Kanban view)' })
   @ApiResponse({ status: 200, description: 'Pipeline grouped by stage' })
   async getPipeline(@CurrentOrg() organizationId: string) {
@@ -72,6 +75,7 @@ export class DealsController {
   }
 
   @Get(':id')
+  @Permissions('deals:read')
   @ApiOperation({ summary: 'Get deal by ID' })
   @ApiResponse({ status: 200, description: 'Deal details' })
   @ApiResponse({ status: 404, description: 'Deal not found' })
@@ -83,6 +87,7 @@ export class DealsController {
   }
 
   @Post()
+  @Permissions('deals:create')
   @ApiOperation({ summary: 'Create a new deal' })
   @ApiResponse({ status: 201, description: 'Deal created' })
   async create(
@@ -94,6 +99,7 @@ export class DealsController {
   }
 
   @Patch(':id')
+  @Permissions('deals:update')
   @ApiOperation({ summary: 'Update deal' })
   @ApiResponse({ status: 200, description: 'Deal updated' })
   async update(
@@ -106,6 +112,7 @@ export class DealsController {
   }
 
   @Patch(':id/stage')
+  @Permissions('deals:stage:change')
   @ApiOperation({ summary: 'Update deal stage (validated transition)' })
   @ApiResponse({ status: 200, description: 'Deal stage updated' })
   async updateStage(
@@ -118,6 +125,7 @@ export class DealsController {
   }
 
   @Delete(':id')
+  @Permissions('deals:delete')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete deal' })
   @ApiResponse({ status: 204, description: 'Deal deleted' })
@@ -129,6 +137,7 @@ export class DealsController {
   }
 
   @Get(':id/activities')
+  @Permissions('deals:read', 'activities:read')
   @ApiOperation({ summary: 'Get deal activities' })
   @ApiQuery({ name: 'page', required: false })
   @ApiQuery({ name: 'limit', required: false })

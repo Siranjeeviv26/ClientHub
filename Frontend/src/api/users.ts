@@ -27,7 +27,7 @@ export const usersApi = {
     api.patch(`/users/${id}/role`, { role }),
 
   updateStatus: (id: string, isActive: boolean): Promise<ApiResponse<User>> =>
-    api.patch(`/users/${id}/status`, isActive),
+    api.patch(`/users/${id}/status`, { isActive }),
 
   remove: (id: string): Promise<void> =>
     api.delete(`/users/${id}`),

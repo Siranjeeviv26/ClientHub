@@ -11,6 +11,15 @@ import { Client, ClientDocument } from './schemas/client.schema';
 import { CreateClientDto } from './dto/create-client.dto';
 import { UpdateClientDto } from './dto/update-client.dto';
 
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+const ALLOWED_SORT_FIELDS = [
+  'createdAt', 'updatedAt', 'companyName', 'status', 'city', 'country',
+  'industry', 'size', 'tags',
+];
+
 @Injectable()
 export class ClientsService {
   private readonly logger = new Logger(ClientsService.name);
@@ -38,7 +47,7 @@ export class ClientsService {
     const query: any = { organizationId: new Types.ObjectId(organizationId) };
 
     if (options.search) {
-      const searchRegex = new RegExp(options.search, 'i');
+      const searchRegex = new RegExp(escapeRegex(options.search), 'i');
       query.$or = [
         { companyName: searchRegex },
         { 'contacts.email': searchRegex },
@@ -63,7 +72,8 @@ export class ClientsService {
     let sort: any = { createdAt: -1 };
     if (options.sort) {
       const sortParts = options.sort.split(':');
-      sort = { [sortParts[0]]: sortParts[1] === 'desc' ? -1 : 1 };
+      const sortField = ALLOWED_SORT_FIELDS.includes(sortParts[0]) ? sortParts[0] : 'createdAt';
+      sort = { [sortField]: sortParts[1] === 'desc' ? -1 : 1 };
     }
 
     const [clients, total] = await Promise.all([
@@ -106,14 +116,23 @@ export class ClientsService {
     return client;
   }
 
+  private sanitizeRefs(obj: any, fields: string[]) {
+    const out = { ...obj };
+    for (const f of fields) {
+      if (out[f] === '' || out[f] === null) delete out[f];
+    }
+    return out;
+  }
+
   async create(organizationId: string, userId: string, dto: CreateClientDto): Promise<ClientDocument> {
     // Ensure first contact is marked as primary
     if (dto.contacts && dto.contacts.length > 0) {
       dto.contacts[0].isPrimary = true;
     }
 
+    const clean = this.sanitizeRefs(dto, ['assignedTo']);
     const client = await this.clientModel.create({
-      ...dto,
+      ...clean,
       organizationId: new Types.ObjectId(organizationId),
       createdBy: new Types.ObjectId(userId),
     });
@@ -132,8 +151,13 @@ export class ClientsService {
     ];
 
     for (const field of updateFields) {
-      if ((dto as any)[field] !== undefined) {
-        (client as any)[field] = (dto as any)[field];
+      const val = (dto as any)[field];
+      if (val === '' && field === 'assignedTo') {
+        (client as any)[field] = undefined;
+        continue;
+      }
+      if (val !== undefined) {
+        (client as any)[field] = val;
       }
     }
 

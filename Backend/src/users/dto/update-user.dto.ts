@@ -30,9 +30,10 @@ export class UpdateUserDto {
 }
 
 export class UpdateUserRoleDto {
-  @ApiProperty({ enum: Role, example: Role.SALES })
-  @IsEnum(Role)
-  role: Role;
+  @ApiProperty({ example: 'SALES', description: 'Role name (supports custom roles)' })
+  @IsString()
+  @MinLength(1)
+  role: string;
 }
 
 export class UpdateUserStatusDto {

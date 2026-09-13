@@ -5,6 +5,7 @@ import { useOrganization } from "./contexts/OrganizationContext";
 import { MainLayout } from "./layouts/MainLayout";
 import { AuthLayout } from "./layouts/AuthLayout";
 import { LoadingSpinner } from "./components/ui/LoadingSpinner";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 
 // Lazy load pages for code splitting
 const DashboardPage = lazy(() =>
@@ -43,6 +44,56 @@ const SettingsPage = lazy(() =>
 );
 const UsersPage = lazy(() =>
   import("./features/users/UsersPage").then((m) => ({ default: m.UsersPage })),
+);
+const RolesPage = lazy(() =>
+  import("./features/roles/RolesPage").then((m) => ({ default: m.RolesPage })),
+);
+const ClientDetailPage = lazy(() =>
+  import("./features/clients/ClientDetailPage").then((m) => ({ default: m.ClientDetailPage })),
+);
+const LeadDetailPage = lazy(() =>
+  import("./features/leads/LeadDetailPage").then((m) => ({ default: m.LeadDetailPage })),
+);
+const DealDetailPage = lazy(() =>
+  import("./features/deals/DealDetailPage").then((m) => ({ default: m.DealDetailPage })),
+);
+const TaskDetailPage = lazy(() =>
+  import("./features/tasks/TaskDetailPage").then((m) => ({ default: m.TaskDetailPage })),
+);
+const OrganizationsPage = lazy(() =>
+  import("./features/organizations/OrganizationsPage").then((m) => ({
+    default: m.OrganizationsPage,
+  })),
+);
+const DocumentsPage = lazy(() =>
+  import("./features/documents/DocumentsPage").then((m) => ({
+    default: m.DocumentsPage,
+  })),
+);
+const CalendarPage = lazy(() =>
+  import("./features/calendar/CalendarPage").then((m) => ({
+    default: m.CalendarPage,
+  })),
+);
+const CommunicationsPage = lazy(() =>
+  import("./features/communications/CommunicationsPage").then((m) => ({
+    default: m.CommunicationsPage,
+  })),
+);
+const ProposalsPage = lazy(() =>
+  import("./features/proposals/ProposalsPage").then((m) => ({
+    default: m.ProposalsPage,
+  })),
+);
+const InvoicesPage = lazy(() =>
+  import("./features/invoices/InvoicesPage").then((m) => ({
+    default: m.InvoicesPage,
+  })),
+);
+const PaymentsPage = lazy(() =>
+  import("./features/payments/PaymentsPage").then((m) => ({
+    default: m.PaymentsPage,
+  })),
 );
 
 const LoginPage = lazy(() =>
@@ -123,40 +174,249 @@ function PublicRoute() {
   return <Outlet />;
 }
 
+function RoleRoute({ allowed }: { allowed: string[] }) {
+  const { user, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <LoadingSpinner size="lg" />
+      </div>
+    );
+  }
+
+  if (!user || !allowed.includes(user.role as string)) {
+    return <Navigate to="/" replace />;
+  }
+
+  return <Outlet />;
+}
+
 function App() {
   return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen flex items-center justify-center">
-          <LoadingSpinner size="lg" />
-        </div>
-      }
-    >
+    <ErrorBoundary>
       <Routes>
         {/* Auth Routes */}
         <Route element={<AuthLayout />}>
           <Route element={<PublicRoute />}>
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<RegisterPage />} />
-            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-            <Route path="/reset-password" element={<ResetPasswordPage />} />
-            <Route path="/verify-email" element={<VerifyEmailPage />} />
+            <Route path="/login" element={
+              <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><LoadingSpinner size="lg" /></div>}>
+                <LoginPage />
+              </Suspense>
+            } />
+            <Route path="/register" element={
+              <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><LoadingSpinner size="lg" /></div>}>
+                <RegisterPage />
+              </Suspense>
+            } />
+            <Route path="/forgot-password" element={
+              <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><LoadingSpinner size="lg" /></div>}>
+                <ForgotPasswordPage />
+              </Suspense>
+            } />
+            <Route path="/reset-password" element={
+              <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><LoadingSpinner size="lg" /></div>}>
+                <ResetPasswordPage />
+              </Suspense>
+            } />
+            <Route path="/verify-email" element={
+              <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><LoadingSpinner size="lg" /></div>}>
+                <VerifyEmailPage />
+              </Suspense>
+            } />
           </Route>
         </Route>
 
         {/* Protected App Routes */}
         <Route element={<ProtectedRoute />}>
           <Route element={<MainLayout />}>
+            <Route
+              path="/settings"
+              element={
+                <ErrorBoundary>
+                  <SettingsPage />
+                </ErrorBoundary>
+              }
+            />
+            <Route
+              path="/settings/organizations"
+              element={
+                <ErrorBoundary>
+                  <OrganizationsPage />
+                </ErrorBoundary>
+              }
+            />
+            <Route
+              path="/settings/:section"
+              element={
+                <ErrorBoundary>
+                  <SettingsPage />
+                </ErrorBoundary>
+              }
+            />
             <Route element={<OrganizationRoute />}>
-              <Route path="/" element={<DashboardPage />} />
-              <Route path="/clients" element={<ClientsPage />} />
-              <Route path="/leads" element={<LeadsPage />} />
-              <Route path="/deals" element={<DealsPage />} />
-              <Route path="/tasks" element={<TasksPage />} />
-              <Route path="/activities" element={<ActivitiesPage />} />
-              <Route path="/notifications" element={<NotificationsPage />} />
-              <Route path="/settings" element={<SettingsPage />} />
-              <Route path="/users" element={<UsersPage />} />
+              <Route
+                path="/"
+                element={
+                  <ErrorBoundary>
+                    <DashboardPage />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="/clients"
+                element={
+                  <ErrorBoundary>
+                    <ClientsPage />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="/clients/:id"
+                element={
+                  <ErrorBoundary>
+                    <ClientDetailPage />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="/leads"
+                element={
+                  <ErrorBoundary>
+                    <LeadsPage />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="/leads/:id"
+                element={
+                  <ErrorBoundary>
+                    <LeadDetailPage />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="/deals"
+                element={
+                  <ErrorBoundary>
+                    <DealsPage />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="/deals/:id"
+                element={
+                  <ErrorBoundary>
+                    <DealDetailPage />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="/tasks"
+                element={
+                  <ErrorBoundary>
+                    <TasksPage />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="/tasks/:id"
+                element={
+                  <ErrorBoundary>
+                    <TaskDetailPage />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="/activities"
+                element={
+                  <ErrorBoundary>
+                    <ActivitiesPage />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="/activities/:id"
+                element={
+                  <ErrorBoundary>
+                    <ActivitiesPage />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="/communications"
+                element={
+                  <ErrorBoundary>
+                    <CommunicationsPage />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="/proposals"
+                element={
+                  <ErrorBoundary>
+                    <ProposalsPage />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="/invoices"
+                element={
+                  <ErrorBoundary>
+                    <InvoicesPage />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="/payments"
+                element={
+                  <ErrorBoundary>
+                    <PaymentsPage />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="/calendar"
+                element={
+                  <ErrorBoundary>
+                    <CalendarPage />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="/documents"
+                element={
+                  <ErrorBoundary>
+                    <DocumentsPage />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="/notifications"
+                element={
+                  <ErrorBoundary>
+                    <NotificationsPage />
+                  </ErrorBoundary>
+                }
+              />
+              <Route element={<RoleRoute allowed={['ADMIN', 'MANAGER']} />}>
+                <Route
+                  path="/users"
+                  element={
+                    <ErrorBoundary>
+                      <UsersPage />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/roles"
+                  element={
+                    <ErrorBoundary>
+                      <RolesPage />
+                    </ErrorBoundary>
+                  }
+                />
+              </Route>
             </Route>
           </Route>
         </Route>
@@ -164,7 +424,7 @@ function App() {
         {/* Catch all */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-    </Suspense>
+    </ErrorBoundary>
   );
 }
 

@@ -1,14 +1,14 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
-import { ThrottlerModule } from '@nestjs/throttler';
-
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import configuration from './config/configuration';
 import { validationSchema } from './config/validation.schema';
-import { ConfigService } from '@nestjs/config';
 import { DatabaseModule } from './database/database.module';
 import { QueueModule } from './queue/queue.module';
+import { QueueWorkerModule } from './queue/queue-worker.module';
 import { AuthModule } from './auth/auth.module';
 import { OrganizationsModule } from './organizations/organizations.module';
+import { PlansModule } from './plans/plans.module';
 import { RolesModule } from './roles/roles.module';
 import { UsersModule } from './users/users.module';
 import { ClientsModule } from './clients/clients.module';
@@ -21,6 +21,12 @@ import { DashboardModule } from './dashboard/dashboard.module';
 import { SeedModule } from './seed/seed.module';
 import { EmailModule } from './email/email.module';
 import { StorageModule } from './storage/storage.module';
+import { DocumentsModule } from './documents/documents.module';
+import { EventsModule } from './events/events.module';
+import { CommunicationsModule } from './communications/communications.module';
+import { ProposalsModule } from './proposals/proposals.module';
+import { InvoicesModule } from './invoices/invoices.module';
+import { PaymentsModule } from './payments/payments.module';
 
 @Module({
   imports: [
@@ -33,15 +39,21 @@ import { StorageModule } from './storage/storage.module';
     ThrottlerModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
-        ttl: configService.get<number>('app.throttle.ttl') ?? 60,
-        limit: configService.get<number>('app.throttle.limit') ?? 100,
+        throttlers: [
+          {
+            ttl: configService.get<number>('app.throttle.ttl') ?? 60,
+            limit: configService.get<number>('app.throttle.limit') ?? 100,
+          },
+        ],
       }) as any,
       inject: [ConfigService],
     }),
     DatabaseModule,
     QueueModule,
+    QueueWorkerModule,
     AuthModule,
     OrganizationsModule,
+    PlansModule,
     RolesModule,
     UsersModule,
     ClientsModule,
@@ -54,6 +66,13 @@ import { StorageModule } from './storage/storage.module';
     SeedModule,
     EmailModule,
     StorageModule,
+    DocumentsModule,
+    EventsModule,
+    CommunicationsModule,
+    ProposalsModule,
+    InvoicesModule,
+    PaymentsModule,
   ],
+  providers: [],
 })
 export class AppModule {}

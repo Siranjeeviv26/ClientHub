@@ -9,6 +9,7 @@ import { OrganizationInvitation, OrganizationInvitationSchema } from './schemas/
 import { User, UserSchema } from '../auth/schemas/user.schema';
 import { AuthModule } from '../auth/auth.module';
 import { EmailModule } from '../email/email.module';
+import { StorageModule } from '../storage/storage.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { EmailModule } from '../email/email.module';
     ]),
     AuthModule,
     EmailModule,
+    StorageModule,
   ],
   controllers: [OrganizationsController],
   providers: [OrganizationsService],

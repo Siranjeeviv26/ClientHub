@@ -31,9 +31,9 @@ export const Tabs = forwardRef<HTMLDivElement, TabsProps>(
     ref,
   ) => {
     const variantClasses = {
-      default: 'border-b border-gray-200',
-      pills: 'gap-1 bg-gray-100 p-1 rounded-lg',
-      underline: 'border-b border-gray-200',
+      default: 'flex gap-1 border-b border-gray-200 overflow-x-auto scrollbar-thin',
+      pills: 'inline-flex gap-1 bg-gray-100 p-1 rounded-xl',
+      underline: 'flex gap-1 border-b border-gray-200 overflow-x-auto scrollbar-thin',
     };
 
     const tabClasses = {

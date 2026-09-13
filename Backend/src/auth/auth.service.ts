@@ -82,14 +82,15 @@ export class AuthService {
     const emailVerificationToken = uuidv4();
     const emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
-    // Create user (organization will be created by caller)
+    // Create user with least privilege. New accounts join an organization
+    // only via invitation — they never mint ADMIN rights or organizations.
     const user = await this.userModel.create({
       email: dto.email.toLowerCase(),
       passwordHash,
       firstName: dto.firstName,
       lastName: dto.lastName,
-      role: 'ADMIN', // First user is admin
-      organizationId: new Types.ObjectId(), // Placeholder, will be updated
+      role: 'EMPLOYEE',
+      organizationId: new Types.ObjectId(), // Placeholder, set on invitation accept
       emailVerificationToken,
       emailVerificationExpires,
     });

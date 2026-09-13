@@ -14,6 +14,7 @@ import { NotificationsService } from './notifications.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
+import { Permissions } from '../common/decorators/permissions.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { CurrentOrg } from '../common/decorators/current-org.decorator';
 
@@ -25,6 +26,7 @@ export class NotificationsController {
   constructor(private notificationsService: NotificationsService) {}
 
   @Get()
+  @Permissions('notifications:read')
   @ApiOperation({ summary: 'Get notifications with pagination' })
   @ApiQuery({ name: 'page', required: false })
   @ApiQuery({ name: 'limit', required: false })
@@ -45,6 +47,7 @@ export class NotificationsController {
   }
 
   @Get('unread-count')
+  @Permissions('notifications:read')
   @ApiOperation({ summary: 'Get unread notification count' })
   @ApiResponse({ status: 200, description: 'Unread count' })
   async getUnreadCount(
@@ -56,6 +59,7 @@ export class NotificationsController {
   }
 
   @Patch(':id/read')
+  @Permissions('notifications:read')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Mark notification as read' })
   @ApiResponse({ status: 200, description: 'Notification marked as read' })
@@ -68,6 +72,7 @@ export class NotificationsController {
   }
 
   @Patch('read-all')
+  @Permissions('notifications:read')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Mark all notifications as read' })
   @ApiResponse({ status: 200, description: 'All notifications marked as read' })

@@ -22,6 +22,7 @@ import { UpdateUserDto, UpdateUserRoleDto, UpdateUserStatusDto, UpdateProfileDto
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
+import { Permissions } from '../common/decorators/permissions.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { CurrentOrg } from '../common/decorators/current-org.decorator';
 
@@ -33,6 +34,7 @@ export class UsersController {
   constructor(private usersService: UsersService) {}
 
   @Get()
+  @Permissions('users:read')
   @ApiOperation({ summary: 'Get all users in organization' })
   @ApiQuery({ name: 'page', required: false })
   @ApiQuery({ name: 'limit', required: false })
@@ -102,6 +104,7 @@ export class UsersController {
   }
 
   @Get(':id')
+  @Permissions('users:read')
   @ApiOperation({ summary: 'Get user by ID' })
   @ApiResponse({ status: 200, description: 'User details' })
   @ApiResponse({ status: 404, description: 'User not found' })
@@ -113,6 +116,7 @@ export class UsersController {
   }
 
   @Patch(':id')
+  @Permissions('users:update')
   @ApiOperation({ summary: 'Update user' })
   @ApiResponse({ status: 200, description: 'User updated' })
   async update(
@@ -125,6 +129,7 @@ export class UsersController {
   }
 
   @Patch(':id/role')
+  @Permissions('members:role:assign')
   @ApiOperation({ summary: 'Update user role' })
   @ApiResponse({ status: 200, description: 'Role updated' })
   async updateRole(
@@ -137,6 +142,7 @@ export class UsersController {
   }
 
   @Patch(':id/status')
+  @Permissions('users:status:change')
   @ApiOperation({ summary: 'Update user status (activate/deactivate)' })
   @ApiResponse({ status: 200, description: 'Status updated' })
   async updateStatus(
@@ -149,6 +155,7 @@ export class UsersController {
   }
 
   @Delete(':id')
+  @Permissions('users:delete')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Remove user from organization' })
   @ApiResponse({ status: 204, description: 'User removed' })

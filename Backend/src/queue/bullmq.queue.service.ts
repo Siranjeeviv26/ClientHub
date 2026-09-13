@@ -15,6 +15,7 @@ export class BullMQQueueService implements QueueService, OnModuleDestroy {
   private queues: Map<string, Queue> = new Map();
   private workers: Map<string, Worker> = new Map();
   private redis: IORedis;
+  private workerRedis: IORedis;
 
   constructor(private configService: ConfigService) {
     const redisUrl = this.configService.get<string>('app.redis.url');
@@ -22,11 +23,17 @@ export class BullMQQueueService implements QueueService, OnModuleDestroy {
       throw new Error('REDIS_URL is required for BullMQ queue service');
     }
 
+    // Queue connection (needs maxRetriesPerRequest)
     this.redis = new IORedis(redisUrl, {
       maxRetriesPerRequest: 3,
       retryStrategy: (times) => Math.min(times * 50, 2000),
       enableReadyCheck: true,
       lazyConnect: true,
+    });
+
+    // Worker connection (must NOT have maxRetriesPerRequest per BullMQ requirement)
+    this.workerRedis = new IORedis(redisUrl, {
+      maxRetriesPerRequest: null,
     });
 
     this.redis.on('error', (err) => {
@@ -75,7 +82,7 @@ export class BullMQQueueService implements QueueService, OnModuleDestroy {
         return processor(mappedJob);
       },
       {
-        connection: this.redis,
+        connection: this.workerRedis,
         concurrency,
       },
     );
@@ -95,6 +102,16 @@ export class BullMQQueueService implements QueueService, OnModuleDestroy {
     this.workers.set(name, worker);
   }
 
+  async removeByDataKey(name: string, key: string, value: any): Promise<void> {
+    const queue = this.getQueue(name);
+    const jobs = await queue.getJobs(['waiting', 'delayed']);
+    for (const job of jobs) {
+      if (job.data[key] === value) {
+        await job.remove();
+      }
+    }
+  }
+
   async close(): Promise<void> {
     for (const [name, worker] of this.workers) {
       await worker.close();
@@ -105,7 +122,8 @@ export class BullMQQueueService implements QueueService, OnModuleDestroy {
       this.logger.log(`Closed queue: ${name}`);
     }
     await this.redis.quit();
-    this.logger.log('Redis connection closed');
+    await this.workerRedis.quit();
+    this.logger.log('Redis connections closed');
   }
 
   private mapJob<T>(job: Job<T>): JobInterface<T> {

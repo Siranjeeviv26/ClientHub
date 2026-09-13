@@ -13,8 +13,14 @@ import { Express } from 'express';
 
 import { User, UserDocument } from '../auth/schemas/user.schema';
 import { OrganizationMember, OrganizationMemberDocument } from '../organizations/schemas/organization-member.schema';
+import { RefreshToken, RefreshTokenDocument } from '../auth/schemas/refresh-token.schema';
 import { UpdateUserDto, UpdateUserRoleDto, UpdateUserStatusDto, UpdateProfileDto, ChangePasswordDto } from './dto/update-user.dto';
 import { Role, hasPermission } from '../roles/role-permissions.enum';
+import { StorageService } from '../storage/storage.service';
+
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
 
 @Injectable()
 export class UsersService {
@@ -23,6 +29,8 @@ export class UsersService {
   constructor(
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     @InjectModel(OrganizationMember.name) private memberModel: Model<OrganizationMemberDocument>,
+    @InjectModel(RefreshToken.name) private refreshTokenModel: Model<RefreshTokenDocument>,
+    private storageService: StorageService,
   ) {}
 
   async findAll(organizationId: string, options: { page?: number; limit?: number; search?: string; role?: string; status?: string } = {}) {
@@ -33,7 +41,7 @@ export class UsersService {
     const query: any = { organizationId: new Types.ObjectId(organizationId) };
 
     if (options.search) {
-      const searchRegex = new RegExp(options.search, 'i');
+      const searchRegex = new RegExp(escapeRegex(options.search), 'i');
       query.$or = [
         { firstName: searchRegex },
         { lastName: searchRegex },
@@ -84,6 +92,10 @@ export class UsersService {
   }
 
   async update(organizationId: string, userId: string, targetUserId: string, dto: UpdateUserDto): Promise<UserDocument> {
+    const caller = await this.findById(organizationId, userId);
+    if (!hasPermission(caller.role, 'users:update')) {
+      throw new ForbiddenException('Insufficient permissions to update users');
+    }
     const user = await this.findById(organizationId, targetUserId);
 
     if (dto.email && dto.email !== user.email) {
@@ -107,8 +119,8 @@ export class UsersService {
     const caller = await this.findById(organizationId, userId);
     const target = await this.findById(organizationId, targetUserId);
 
-    // Check caller permission
-    if (!hasPermission(caller.role, 'users:role:assign')) {
+    // Check caller permission (matrix uses members:role:assign)
+    if (!hasPermission(caller.role, 'members:role:assign')) {
       throw new ForbiddenException('Insufficient permissions to assign roles');
     }
 
@@ -126,10 +138,14 @@ export class UsersService {
 
     // Don't allow assigning higher role than caller
     const hierarchy: Role[] = [Role.ADMIN, Role.MANAGER, Role.SALES, Role.EMPLOYEE];
-    const callerIndex = hierarchy.indexOf(caller.role);
-    const targetIndex = hierarchy.indexOf(dto.role);
-    if (targetIndex < callerIndex) {
+    const callerIndex = hierarchy.indexOf(caller.role as Role);
+    const targetIndex = hierarchy.indexOf(dto.role as Role);
+    // Only enforce hierarchy for system roles; custom roles are treated as lowest (EMPLOYEE level) unless ADMIN
+    if (targetIndex !== -1 && callerIndex !== -1 && targetIndex < callerIndex) {
       throw new ForbiddenException('Cannot assign a role higher than your own');
+    }
+    if (targetIndex === -1 && caller.role !== Role.ADMIN) {
+      throw new ForbiddenException('Only ADMIN can assign custom roles');
     }
 
     target.role = dto.role;
@@ -232,12 +248,21 @@ export class UsersService {
   async uploadAvatar(organizationId: string, userId: string, file: Express.Multer.File): Promise<{ avatar: string }> {
     const user = await this.findById(organizationId, userId);
 
-    // Placeholder - actual Cloudinary upload goes here
-    const avatarUrl = `/uploads/avatars/${userId}-${Date.now()}${this.getExtension(file.originalname)}`;
-    user.avatar = avatarUrl;
+    // Delete old avatar if exists
+    if (user.avatar) {
+      await this.storageService.deleteByUrl(user.avatar);
+    }
+
+    // Upload new avatar to Cloudinary
+    const result = await this.storageService.upload(file, {
+      folder: `clienthub/avatars/${userId}`,
+      transformation: [{ width: 256, height: 256, crop: 'fill', gravity: 'auto' }],
+    });
+
+    user.avatar = result.url;
     await user.save();
 
-    return { avatar: avatarUrl };
+    return { avatar: result.url };
   }
 
   async changePassword(organizationId: string, userId: string, dto: ChangePasswordDto): Promise<{ message: string }> {
@@ -254,13 +279,12 @@ export class UsersService {
     user.passwordHash = await bcrypt.hash(dto.newPassword, 12);
     await user.save();
 
-    // Revoke all refresh tokens - would use auth service
+    await this.refreshTokenModel.updateMany(
+      { userId: new Types.ObjectId(userId), revoked: false },
+      { revoked: true, revokedAt: new Date() },
+    );
+
     this.logger.log(`Password changed for user ${userId}`);
     return { message: 'Password changed successfully' };
-  }
-
-  private getExtension(filename: string): string {
-    const parts = filename.split('.');
-    return parts.length > 1 ? '.' + parts.pop() : '';
   }
 }

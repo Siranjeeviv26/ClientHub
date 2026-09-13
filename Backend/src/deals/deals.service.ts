@@ -13,6 +13,15 @@ import { CreateDealDto } from './dto/create-deal.dto';
 import { UpdateDealDto } from './dto/update-deal.dto';
 import { ActivityService } from '../activities/activities.service';
 
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+const ALLOWED_SORT_FIELDS = [
+  'createdAt', 'updatedAt', 'title', 'value', 'stage', 'probability',
+  'expectedCloseDate', 'status',
+];
+
 @Injectable()
 export class DealsService {
   private readonly logger = new Logger(DealsService.name);
@@ -52,7 +61,7 @@ export class DealsService {
     const query: any = { organizationId: new Types.ObjectId(organizationId) };
 
     if (options.search) {
-      const searchRegex = new RegExp(options.search, 'i');
+      const searchRegex = new RegExp(escapeRegex(options.search), 'i');
       query.$or = [
         { title: searchRegex },
       ];
@@ -77,7 +86,8 @@ export class DealsService {
     let sort: any = { createdAt: -1 };
     if (options.sort) {
       const sortParts = options.sort.split(':');
-      sort = { [sortParts[0]]: sortParts[1] === 'desc' ? -1 : 1 };
+      const sortField = ALLOWED_SORT_FIELDS.includes(sortParts[0]) ? sortParts[0] : 'createdAt';
+      sort = { [sortField]: sortParts[1] === 'desc' ? -1 : 1 };
     }
 
     const [deals, total] = await Promise.all([
@@ -153,12 +163,21 @@ export class DealsService {
     return deal;
   }
 
+  private sanitizeRefs(obj: any, fields: string[]) {
+    const out = { ...obj };
+    for (const f of fields) {
+      if (out[f] === '' || out[f] === null) delete out[f];
+    }
+    return out;
+  }
+
   async create(organizationId: string, userId: string, dto: CreateDealDto): Promise<DealDocument> {
     // Auto-set probability based on stage if not provided
     const probability = dto.probability ?? this.getDefaultProbability(dto.stage || DealStage.NEW);
 
+    const clean = this.sanitizeRefs(dto, ['clientId', 'leadId', 'assignedTo']);
     const deal = await this.dealModel.create({
-      ...dto,
+      ...clean,
       probability,
       organizationId: new Types.ObjectId(organizationId),
       createdBy: new Types.ObjectId(userId),
@@ -189,8 +208,14 @@ export class DealsService {
     ];
 
     for (const field of updateFields) {
-      if ((dto as any)[field] !== undefined) {
-        (deal as any)[field] = (dto as any)[field];
+      const val = (dto as any)[field];
+      if (val === '' && ['clientId', 'leadId', 'assignedTo'].includes(field)) {
+        (deal as any)[field] = undefined;
+        await (deal as any).collection.updateOne({ _id: (deal as any)._id }, { $unset: { [field]: 1 } });
+        continue;
+      }
+      if (val !== undefined) {
+        (deal as any)[field] = val;
       }
     }
 

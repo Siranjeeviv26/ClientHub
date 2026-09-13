@@ -15,6 +15,9 @@ export class Organization extends BaseDocument {
   @Prop({ trim: true })
   logo?: string;
 
+  @Prop({ type: Number, required: false, min: 1 })
+  maxMembers?: number;
+
   @Prop({ type: Object, default: {} })
   settings: {
     timezone?: string;

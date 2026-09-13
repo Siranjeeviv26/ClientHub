@@ -19,6 +19,7 @@ import { UpdateClientDto } from './dto/update-client.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
+import { Permissions } from '../common/decorators/permissions.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { CurrentOrg } from '../common/decorators/current-org.decorator';
 
@@ -30,6 +31,7 @@ export class ClientsController {
   constructor(private clientsService: ClientsService) {}
 
   @Get()
+  @Permissions('clients:read')
   @ApiOperation({ summary: 'Get all clients with pagination, search, and filters' })
   @ApiQuery({ name: 'page', required: false })
   @ApiQuery({ name: 'limit', required: false })
@@ -61,6 +63,7 @@ export class ClientsController {
   }
 
   @Get(':id')
+  @Permissions('clients:read')
   @ApiOperation({ summary: 'Get client by ID' })
   @ApiResponse({ status: 200, description: 'Client details' })
   @ApiResponse({ status: 404, description: 'Client not found' })
@@ -72,6 +75,7 @@ export class ClientsController {
   }
 
   @Post()
+  @Permissions('clients:create')
   @ApiOperation({ summary: 'Create a new client' })
   @ApiResponse({ status: 201, description: 'Client created' })
   async create(
@@ -83,6 +87,7 @@ export class ClientsController {
   }
 
   @Patch(':id')
+  @Permissions('clients:update')
   @ApiOperation({ summary: 'Update client' })
   @ApiResponse({ status: 200, description: 'Client updated' })
   async update(
@@ -94,6 +99,7 @@ export class ClientsController {
   }
 
   @Delete(':id')
+  @Permissions('clients:delete')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete client' })
   @ApiResponse({ status: 204, description: 'Client deleted' })
@@ -105,6 +111,7 @@ export class ClientsController {
   }
 
   @Get(':id/deals')
+  @Permissions('clients:read', 'deals:read')
   @ApiOperation({ summary: 'Get client deals' })
   @ApiResponse({ status: 200, description: 'Client deals' })
   async getDeals(
@@ -115,6 +122,7 @@ export class ClientsController {
   }
 
   @Get(':id/tasks')
+  @Permissions('clients:read', 'tasks:read')
   @ApiOperation({ summary: 'Get client tasks' })
   @ApiResponse({ status: 200, description: 'Client tasks' })
   async getTasks(
@@ -125,6 +133,7 @@ export class ClientsController {
   }
 
   @Get(':id/activities')
+  @Permissions('clients:read', 'activities:read')
   @ApiOperation({ summary: 'Get client activities' })
   @ApiQuery({ name: 'page', required: false })
   @ApiQuery({ name: 'limit', required: false })
@@ -139,6 +148,7 @@ export class ClientsController {
   }
 
   @Post(':id/notes')
+  @Permissions('clients:update')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Add note to client' })
   @ApiResponse({ status: 200, description: 'Note added' })

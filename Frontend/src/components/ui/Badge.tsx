@@ -36,10 +36,10 @@ export const Badge = forwardRef<HTMLSpanElement, BadgeProps>(
     return (
       <span
         ref={ref}
-        className={clsx('inline-flex items-center gap-1 rounded-full font-medium', variantClasses[variant], sizeClasses[size], className)}
+        className={clsx('inline-flex items-center justify-center gap-1 rounded-full font-medium whitespace-nowrap shrink-0 leading-none tracking-wide', variantClasses[variant], sizeClasses[size], className)}
         {...props}
       >
-        {dot && <span className={clsx('w-1.5 h-1.5 rounded-full', variantClasses[variant].replace('bg-', 'bg-').replace('text-', 'bg-'))} />}
+        {dot && <span className={clsx('w-1.5 h-1.5 rounded-full shrink-0', variantClasses[variant].replace('bg-', 'bg-').replace('text-', 'bg-'))} />}
         {children}
       </span>
     );

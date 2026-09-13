@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import {
   Bell,
   Check,
+  Clock,
   Mail,
   Target,
   DollarSign,
@@ -12,8 +13,8 @@ import {
   Filter,
   ChevronLeft,
   ChevronRight,
+  X,
 } from 'lucide-react';
-import { Column, Table } from '../../components/ui/Table';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
@@ -51,6 +52,9 @@ export function NotificationsPage() {
   const [readFilter, setReadFilter] = useState<'all' | 'read' | 'unread'>('all');
   const [typeFilter, setTypeFilter] = useState('');
   const [unreadCount, setUnreadCount] = useState(0);
+  const typeActive = typeFilter !== '';
+  const readActive = readFilter !== 'all';
+  const filteredByType = typeFilter ? notifications.filter(n => n.type === typeFilter) : notifications;
 
   const fetchNotifications = async () => {
     setIsLoading(true);
@@ -63,12 +67,22 @@ export function NotificationsPage() {
         }),
         notificationsApi.getUnreadCount(),
       ]);
-      if (notifRes.success) {
-        setNotifications(notifRes.data.items);
-        setPagination(prev => ({ ...prev, ...notifRes.data.pagination }));
+      if ((notifRes as any)?.success && (notifRes as any)?.data) {
+        const d: any = (notifRes as any).data;
+        if (d.items) {
+          setNotifications(d.items || []);
+          if (d.pagination) setPagination(prev => ({ ...prev, ...d.pagination }));
+        } else if (Array.isArray(d)) {
+          setNotifications(d);
+        }
+      } else if (Array.isArray((notifRes as any)?.data)) {
+        setNotifications((notifRes as any).data);
       }
-      if (countRes.success) {
-        setUnreadCount(countRes.data.count);
+      if ((countRes as any)?.success && (countRes as any)?.data) {
+        const c: any = (countRes as any).data;
+        setUnreadCount(typeof c === 'number' ? c : c.count ?? 0);
+      } else if (typeof (countRes as any)?.data === 'number') {
+        setUnreadCount((countRes as any).data);
       }
     } catch (error) {
       console.error('Failed to fetch notifications:', error);
@@ -124,7 +138,7 @@ export function NotificationsPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Header */}
       <div className="page-header">
         <div>
@@ -141,61 +155,84 @@ export function NotificationsPage() {
       </div>
 
       {/* Filters */}
-      <div className="card p-4">
-        <div className="flex flex-col sm:flex-row gap-4">
-          <Select
-            options={[
-              { value: 'all', label: 'All' },
-              { value: 'unread', label: 'Unread' },
-              { value: 'read', label: 'Read' },
-            ]}
-            value={readFilter}
-            onChange={(e) => { setReadFilter(e.target.value as any); setPagination(prev => ({ ...prev, page: 1 })); }}
-            placeholder="Filter by read status"
-            className="w-full sm:w-48"
-          />
-          <Select
-            options={[{ value: '', label: 'All Types' }, ...TYPE_OPTIONS]}
-            value={typeFilter}
-            onChange={(e) => { setTypeFilter(e.target.value); setPagination(prev => ({ ...prev, page: 1 })); }}
-            placeholder="Filter by type"
-            className="w-full sm:w-48"
-          />
+      <div className="bg-white rounded-2xl border border-gray-200/70 shadow-sm p-5">
+        <div className="flex flex-col lg:flex-row lg:items-center gap-3 lg:justify-between">
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-500"><Filter className="w-3.5 h-3.5" /> Filters</span>
+            <span className="text-xs text-gray-400">• {pagination.total} total</span>
+          </div>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <div className="w-full sm:w-[150px] shrink-0">
+              <Select
+                options={[
+                  { value: 'all', label: 'All statuses' },
+                  { value: 'unread', label: 'Unread' },
+                  { value: 'read', label: 'Read' },
+                ]}
+                value={readFilter}
+                onChange={(e) => { setReadFilter(e.target.value as any); setPagination(prev => ({ ...prev, page: 1 })); }}
+                className="h-9 text-sm"
+              />
+            </div>
+            <div className="w-full sm:w-[180px] shrink-0">
+              <Select
+                options={[{ value: '', label: 'All types' }, ...TYPE_OPTIONS]}
+                value={typeFilter}
+                onChange={(e) => { setTypeFilter(e.target.value); }}
+                className="h-9 text-sm"
+              />
+            </div>
+            {(readActive || typeActive) && (
+              <Button variant="ghost" size="sm" onClick={() => { setReadFilter('all'); setTypeFilter(''); setPagination(prev => ({ ...prev, page: 1 })); }} className="h-9 px-3 text-xs border border-gray-200 bg-white hover:bg-gray-50 whitespace-nowrap">
+                <X className="w-3.5 h-3.5" /> Clear
+              </Button>
+            )}
+          </div>
         </div>
+        {(readActive || typeActive) && (
+          <div className="mt-3 pt-3 border-t border-gray-100 flex items-center gap-2 flex-wrap">
+            {readActive && <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary-50 border border-primary-200 text-xs font-medium text-primary-700 capitalize">{readFilter}<button onClick={() => setReadFilter('all')} className="hover:bg-primary-100 rounded-full p-0.5"><X className="w-3 h-3" /></button></span>}
+            {typeActive && <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gray-50 border border-gray-200 text-xs font-medium text-gray-700">{TYPE_OPTIONS.find(o => o.value === typeFilter)?.label}<button onClick={() => setTypeFilter('')} className="hover:bg-gray-100 rounded-full p-0.5"><X className="w-3 h-3" /></button></span>}
+            <span className="text-xs text-gray-400">{filteredByType.length} shown</span>
+          </div>
+        )}
       </div>
 
       {/* Notifications List */}
       {isLoading ? (
         <div className="space-y-3">
           {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="card animate-pulse p-4">
+            <div key={i} className="bg-white rounded-2xl border border-gray-200/70 p-4 animate-pulse">
               <div className="flex gap-4">
                 <div className="skeleton w-10 h-10 rounded-full" />
                 <div className="flex-1">
-                  <div className="skeleton h-5 w-3/4" />
-                  <div className="skeleton h-4 w-1/2 mt-2" />
+                  <div className="skeleton h-5 w-3/4 rounded-lg" />
+                  <div className="skeleton h-4 w-1/2 mt-2 rounded-lg" />
                 </div>
               </div>
             </div>
           ))}
         </div>
-      ) : notifications.length === 0 ? (
-        <div className="card p-12 text-center">
-          <Bell className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No notifications</h3>
-          <p className="text-gray-500">You're all caught up!</p>
+      ) : filteredByType.length === 0 ? (
+        <div className="bg-white rounded-2xl border border-gray-200/70 shadow-sm p-12 text-center">
+          <div className="w-12 h-12 rounded-xl bg-gray-50 border border-gray-200 flex items-center justify-center mx-auto mb-3">
+            <Bell className="w-6 h-6 text-gray-400" />
+          </div>
+          <h3 className="text-sm font-semibold text-gray-900 mb-1">{typeActive ? 'No matching notifications' : 'No notifications'}</h3>
+          <p className="text-sm text-gray-500">{typeActive ? `No "${TYPE_OPTIONS.find(o => o.value === typeFilter)?.label}" notifications on this page.` : "You're all caught up!"}</p>
+          {typeActive && <Button variant="ghost" size="sm" onClick={() => setTypeFilter('')} className="mt-3">Clear type filter</Button>}
         </div>
       ) : (
         <div className="space-y-3">
-          {notifications.map((notification) => (
+          {filteredByType.map((notification) => (
             <div
               key={notification._id}
-              className={cn('card p-4 transition-colors cursor-pointer', !notification.read && 'bg-blue-50 border-blue-100')}
+              className={cn('bg-white rounded-2xl border shadow-sm p-4 cursor-pointer transition-all hover:shadow-md', !notification.read ? 'border-primary-200 bg-primary-50/30' : 'border-gray-200/70 hover:border-gray-200')}
               onClick={() => navigateToEntity(notification)}
             >
               <div className="flex items-start gap-4">
                 <div className={cn('w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0', !notification.read ? 'bg-primary-100 text-primary-600' : 'bg-gray-100 text-gray-400')}>
-                  {NOTIFICATION_TYPE_CONFIG[notification.type]?.icon || <Bell className="w-5 h-5" />}
+                  {NOTIFICATION_TYPE_CONFIG[notification.type as NotificationType]?.icon || <Bell className="w-5 h-5" />}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-4">
@@ -209,10 +246,10 @@ export function NotificationsPage() {
                     </div>
                     <div className="flex items-center gap-3 flex-shrink-0">
                       <Badge variant="gray" size="sm" className="capitalize">
-                        {NOTIFICATION_TYPE_CONFIG[notification.type]?.label || notification.type}
+                        {NOTIFICATION_TYPE_CONFIG[notification.type as NotificationType]?.label || String(notification.type || 'notification').replace(/_/g, ' ')}
                       </Badge>
                       <span className="text-xs text-gray-400 whitespace-nowrap">
-                        {formatRelativeTime(notification.createdAt)}
+                        {notification.createdAt ? formatRelativeTime(notification.createdAt) : ''}
                       </span>
                       {!notification.read && (
                         <div className="w-2 h-2 bg-primary-500 rounded-full" />
@@ -222,16 +259,21 @@ export function NotificationsPage() {
                   {notification.relatedEntity && (
                     <div className="mt-2 flex items-center gap-2 text-sm text-gray-500">
                       <Badge variant="gray" size="sm" className="capitalize">
-                        {notification.relatedEntity.type}
+                        {notification.relatedEntity.type || '—'}
                       </Badge>
-                      <span>{notification.relatedEntity.name || notification.relatedEntity.id.slice(0, 8) + '...'}</span>
+                      <span>{notification.relatedEntity.name || (notification.relatedEntity.id ? String(notification.relatedEntity.id).slice(0, 8) + '...' : '')}</span>
                       <ArrowRight className="w-3 h-3 text-gray-300" />
                     </div>
                   )}
                   {notification.triggeredBy && (
                     <div className="mt-2 flex items-center gap-2 text-xs text-gray-400">
-                      <Avatar name={`${(notification.triggeredBy as any).firstName} ${(notification.triggeredBy as any).lastName}`} src={(notification.triggeredBy as any).avatar} size="sm" />
-                      <span>Triggered by {(notification.triggeredBy as any).firstName} {(notification.triggeredBy as any).lastName}</span>
+                      {(() => {
+                        const tb: any = notification.triggeredBy;
+                        const isObj = tb && typeof tb === 'object';
+                        const name = isObj ? (`${tb.firstName || ''} ${tb.lastName || ''}`.trim() || tb.name || 'User') : String(tb).slice(0, 8);
+                        const avatar = isObj ? tb.avatar : undefined;
+                        return <><Avatar name={name} src={avatar} size="sm" /><span>Triggered by {name}</span></>;
+                      })()}
                     </div>
                   )}
                 </div>
@@ -257,8 +299,3 @@ export function NotificationsPage() {
     </div>
   );
 }
-
-import { Plus } from 'lucide-react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';

@@ -19,6 +19,7 @@ import { UpdateTaskDto } from './dto/update-task.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
+import { Permissions } from '../common/decorators/permissions.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { CurrentOrg } from '../common/decorators/current-org.decorator';
 import { TaskStatus, TaskPriority } from './schemas/task.schema';
@@ -31,6 +32,7 @@ export class TasksController {
   constructor(private tasksService: TasksService) {}
 
   @Get()
+  @Permissions('tasks:read')
   @ApiOperation({ summary: 'Get all tasks with pagination, search, and filters' })
   @ApiQuery({ name: 'page', required: false })
   @ApiQuery({ name: 'limit', required: false })
@@ -74,6 +76,7 @@ export class TasksController {
   }
 
   @Get('overdue')
+  @Permissions('tasks:read')
   @ApiOperation({ summary: 'Get overdue tasks' })
   @ApiResponse({ status: 200, description: 'Overdue tasks' })
   async getOverdue(@CurrentOrg() organizationId: string) {
@@ -81,6 +84,7 @@ export class TasksController {
   }
 
   @Get('upcoming')
+  @Permissions('tasks:read')
   @ApiOperation({ summary: 'Get upcoming tasks' })
   @ApiQuery({ name: 'days', required: false })
   @ApiResponse({ status: 200, description: 'Upcoming tasks' })
@@ -89,6 +93,7 @@ export class TasksController {
   }
 
   @Get(':id')
+  @Permissions('tasks:read')
   @ApiOperation({ summary: 'Get task by ID' })
   @ApiResponse({ status: 200, description: 'Task details' })
   @ApiResponse({ status: 404, description: 'Task not found' })
@@ -100,6 +105,7 @@ export class TasksController {
   }
 
   @Post()
+  @Permissions('tasks:create')
   @ApiOperation({ summary: 'Create a new task' })
   @ApiResponse({ status: 201, description: 'Task created' })
   async create(
@@ -111,6 +117,7 @@ export class TasksController {
   }
 
   @Patch(':id')
+  @Permissions('tasks:update')
   @ApiOperation({ summary: 'Update task' })
   @ApiResponse({ status: 200, description: 'Task updated' })
   async update(
@@ -123,6 +130,7 @@ export class TasksController {
   }
 
   @Delete(':id')
+  @Permissions('tasks:delete')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete task' })
   @ApiResponse({ status: 204, description: 'Task deleted' })

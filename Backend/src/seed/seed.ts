@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { SeedModule } from './seed.module';
 import { SeedService } from './seed.service';
@@ -18,10 +18,10 @@ import { validationSchema } from '../config/validation.schema';
     }),
     MongooseModule.forRootAsync({
       imports: [ConfigModule],
-      useFactory: async (configService: any) => ({
-        uri: configService.get('app.mongodb.uri'),
+      useFactory: async (configService: ConfigService) => ({
+        uri: configService.get<string>('app.mongodb.uri'),
       }),
-      inject: [ConfigModule],
+      inject: [ConfigService],
     }),
     SeedModule,
   ],
@@ -34,7 +34,7 @@ async function bootstrap() {
   });
 
   const seedService = app.get(SeedService);
-  await seedService.seedDemoData();
+  await seedService.seedIfNeeded();
 
   await app.close();
   console.log('✅ Seeding completed');

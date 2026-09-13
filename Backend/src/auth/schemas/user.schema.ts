@@ -28,8 +28,8 @@ export class User extends BaseDocument {
   @Prop({ trim: true })
   jobTitle?: string;
 
-  @Prop({ type: String, enum: Role, default: Role.EMPLOYEE })
-  role: Role;
+  @Prop({ type: String, default: Role.EMPLOYEE })
+  role: string;
 
   @Prop({ type: Types.ObjectId, ref: 'Organization', required: false, index: true })
   organizationId?: Types.ObjectId;

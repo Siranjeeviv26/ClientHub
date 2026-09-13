@@ -133,6 +133,14 @@ export class MemoryQueueService implements QueueService, OnModuleDestroy {
     }
   }
 
+  async removeByDataKey(name: string, key: string, value: any): Promise<void> {
+    const queue = this.getQueue(name);
+    const idx = queue.findIndex((job) => job.data[key] === value && job.status === 'waiting');
+    if (idx !== -1) {
+      queue.splice(idx, 1);
+    }
+  }
+
   async close(): Promise<void> {
     for (const [name, worker] of this.workers) {
       clearInterval(worker.interval);

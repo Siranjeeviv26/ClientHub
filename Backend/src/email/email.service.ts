@@ -81,6 +81,44 @@ export class EmailService {
     });
   }
 
+  async sendProposalEmail(email: string, proposalNumber: string, title: string, total: number, clientUrl: string): Promise<void> {
+    await this.sendEmail({
+      to: email,
+      subject: `New Proposal ${proposalNumber} - ${title || 'ClientHub'}`,
+      html: this.getProposalTemplate(proposalNumber, title, total, clientUrl),
+      text: `You have a new proposal ${proposalNumber} for $${total}. View at ${clientUrl}`,
+    });
+  }
+
+  async sendInvoiceEmail(email: string, invoiceNumber: string, total: number, dueAt: Date, clientUrl: string): Promise<void> {
+    const dueDate = dueAt.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    await this.sendEmail({
+      to: email,
+      subject: `Invoice ${invoiceNumber} - Payment Due ${dueDate}`,
+      html: this.getInvoiceTemplate(invoiceNumber, total, dueDate, clientUrl),
+      text: `Invoice ${invoiceNumber} for $${total} is due on ${dueDate}. Pay at ${clientUrl}`,
+    });
+  }
+
+  async sendPaymentReceivedEmail(email: string, paymentNumber: string, amount: number, invoiceNumber: string): Promise<void> {
+    await this.sendEmail({
+      to: email,
+      subject: `Payment Received - ${paymentNumber}`,
+      html: this.getPaymentReceivedTemplate(paymentNumber, amount, invoiceNumber),
+      text: `Payment of $${amount} received for invoice ${invoiceNumber}. Reference: ${paymentNumber}`,
+    });
+  }
+
+  async sendPaymentReminderEmail(email: string, invoiceNumber: string, amountDue: number, dueAt: Date, clientUrl: string): Promise<void> {
+    const dueDate = dueAt.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    await this.sendEmail({
+      to: email,
+      subject: `Payment Reminder - Invoice ${invoiceNumber}`,
+      html: this.getPaymentReminderTemplate(invoiceNumber, amountDue, dueDate, clientUrl),
+      text: `Reminder: Invoice ${invoiceNumber} for $${amountDue} is due on ${dueDate}. Pay at ${clientUrl}`,
+    });
+  }
+
   async processSendEmailJob(data: EmailJobData): Promise<void> {
     if (!this.apiKey) {
       this.logger.log(`📧 [DEV MODE] Email to ${data.to}: ${data.subject}`);
@@ -212,6 +250,128 @@ export class EmailService {
               <a href="${clientUrl}" style="background: #667eea; color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; display: inline-block;">Get Started</a>
             </div>
             <p style="color: #9ca3af; font-size: 14px;">Need help? Reply to this email or visit our help center.</p>
+          </div>
+        </body>
+      </html>
+    `;
+  }
+
+  private getProposalTemplate(proposalNumber: string, title: string, total: number, clientUrl: string): string {
+    return `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
+            <h1 style="color: white; margin: 0; font-size: 28px;">ClientHub</h1>
+          </div>
+          <div style="background: #f9fafb; padding: 30px; border-radius: 0 0 12px 12px; border: 1px solid #e5e7eb;">
+            <h2 style="color: #1f2937; margin-top: 0;">New Proposal: ${proposalNumber}</h2>
+            <p style="color: #4b5563;">${title ? `Proposal: ${title}` : 'A new proposal has been created for you.'}</p>
+            <div style="background: white; border-radius: 8px; padding: 20px; margin: 20px 0; border: 1px solid #e5e7eb;">
+              <p style="margin: 0; color: #6b7280; font-size: 14px;">Total Amount</p>
+              <p style="margin: 4px 0 0; color: #111827; font-size: 28px; font-weight: 700;">$${total.toLocaleString()}</p>
+            </div>
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${clientUrl}" style="background: #2563eb; color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; display: inline-block;">View Proposal</a>
+            </div>
+          </div>
+        </body>
+      </html>
+    `;
+  }
+
+  private getInvoiceTemplate(invoiceNumber: string, total: number, dueDate: string, clientUrl: string): string {
+    return `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
+            <h1 style="color: white; margin: 0; font-size: 28px;">ClientHub</h1>
+          </div>
+          <div style="background: #f9fafb; padding: 30px; border-radius: 0 0 12px 12px; border: 1px solid #e5e7eb;">
+            <h2 style="color: #1f2937; margin-top: 0;">Invoice ${invoiceNumber}</h2>
+            <p style="color: #4b5563;">An invoice has been generated for your review.</p>
+            <div style="background: white; border-radius: 8px; padding: 20px; margin: 20px 0; border: 1px solid #e5e7eb;">
+              <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                <span style="color: #6b7280;">Amount Due</span>
+                <span style="color: #111827; font-weight: 700; font-size: 24px;">$${total.toLocaleString()}</span>
+              </div>
+              <div style="display: flex; justify-content: space-between;">
+                <span style="color: #6b7280;">Due Date</span>
+                <span style="color: #dc2626; font-weight: 600;">${dueDate}</span>
+              </div>
+            </div>
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${clientUrl}" style="background: #059669; color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; display: inline-block;">Pay Now</a>
+            </div>
+          </div>
+        </body>
+      </html>
+    `;
+  }
+
+  private getPaymentReceivedTemplate(paymentNumber: string, amount: number, invoiceNumber: string): string {
+    return `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="background: linear-gradient(135deg, #059669 0%, #047857 100%); padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
+            <h1 style="color: white; margin: 0; font-size: 28px;">ClientHub</h1>
+          </div>
+          <div style="background: #f9fafb; padding: 30px; border-radius: 0 0 12px 12px; border: 1px solid #e5e7eb;">
+            <h2 style="color: #059669; margin-top: 0;">Payment Received ✓</h2>
+            <p style="color: #4b5563;">A payment has been recorded for invoice ${invoiceNumber}.</p>
+            <div style="background: white; border-radius: 8px; padding: 20px; margin: 20px 0; border: 1px solid #e5e7eb;">
+              <p style="margin: 0; color: #6b7280; font-size: 14px;">Amount Received</p>
+              <p style="margin: 4px 0 0; color: #059669; font-size: 28px; font-weight: 700;">$${amount.toLocaleString()}</p>
+              <p style="margin: 10px 0 0; color: #9ca3af; font-size: 14px;">Reference: ${paymentNumber}</p>
+            </div>
+          </div>
+        </body>
+      </html>
+    `;
+  }
+
+  private getPaymentReminderTemplate(invoiceNumber: string, amountDue: number, dueDate: string, clientUrl: string): string {
+    return `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="background: linear-gradient(135deg, #d97706 0%, #b45309 100%); padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
+            <h1 style="color: white; margin: 0; font-size: 28px;">ClientHub</h1>
+          </div>
+          <div style="background: #f9fafb; padding: 30px; border-radius: 0 0 12px 12px; border: 1px solid #e5e7eb;">
+            <h2 style="color: #d97706; margin-top: 0;">Payment Reminder</h2>
+            <p style="color: #4b5563;">This is a friendly reminder that invoice ${invoiceNumber} is due soon.</p>
+            <div style="background: white; border-radius: 8px; padding: 20px; margin: 20px 0; border: 1px solid #e5e7eb;">
+              <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                <span style="color: #6b7280;">Amount Due</span>
+                <span style="color: #111827; font-weight: 700; font-size: 24px;">$${amountDue.toLocaleString()}</span>
+              </div>
+              <div style="display: flex; justify-content: space-between;">
+                <span style="color: #6b7280;">Due Date</span>
+                <span style="color: #dc2626; font-weight: 600;">${dueDate}</span>
+              </div>
+            </div>
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${clientUrl}" style="background: #d97706; color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; display: inline-block;">Pay Now</a>
+            </div>
           </div>
         </body>
       </html>

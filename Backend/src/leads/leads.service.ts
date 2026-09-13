@@ -12,6 +12,15 @@ import { CreateLeadDto } from './dto/create-lead.dto';
 import { UpdateLeadDto } from './dto/update-lead.dto';
 import { ActivityService } from '../activities/activities.service';
 
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+const ALLOWED_SORT_FIELDS = [
+  'createdAt', 'updatedAt', 'firstName', 'lastName', 'email', 'company',
+  'stage', 'score', 'estimatedValue', 'status', 'source',
+];
+
 @Injectable()
 export class LeadsService {
   private readonly logger = new Logger(LeadsService.name);
@@ -42,7 +51,7 @@ export class LeadsService {
     const query: any = { organizationId: new Types.ObjectId(organizationId) };
 
     if (options.search) {
-      const searchRegex = new RegExp(options.search, 'i');
+      const searchRegex = new RegExp(escapeRegex(options.search), 'i');
       query.$or = [
         { firstName: searchRegex },
         { lastName: searchRegex },
@@ -74,7 +83,8 @@ export class LeadsService {
     let sort: any = { createdAt: -1 };
     if (options.sort) {
       const sortParts = options.sort.split(':');
-      sort = { [sortParts[0]]: sortParts[1] === 'desc' ? -1 : 1 };
+      const sortField = ALLOWED_SORT_FIELDS.includes(sortParts[0]) ? sortParts[0] : 'createdAt';
+      sort = { [sortField]: sortParts[1] === 'desc' ? -1 : 1 };
     }
 
     const [leads, total] = await Promise.all([
@@ -144,9 +154,18 @@ export class LeadsService {
     return lead;
   }
 
+  private sanitizeRefs(obj: any, fields: string[]) {
+    const out = { ...obj };
+    for (const f of fields) {
+      if (out[f] === '' || out[f] === null) delete out[f];
+    }
+    return out;
+  }
+
   async create(organizationId: string, userId: string, dto: CreateLeadDto): Promise<LeadDocument> {
+    const clean = this.sanitizeRefs(dto, ['assignedTo']);
     const lead = await this.leadModel.create({
-      ...dto,
+      ...clean,
       organizationId: new Types.ObjectId(organizationId),
       createdBy: new Types.ObjectId(userId),
     });
@@ -177,8 +196,13 @@ export class LeadsService {
     ];
 
     for (const field of updateFields) {
-      if ((dto as any)[field] !== undefined) {
-        (lead as any)[field] = (dto as any)[field];
+      const val = (dto as any)[field];
+      if (val === '' && field === 'assignedTo') {
+        (lead as any)[field] = undefined;
+        continue;
+      }
+      if (val !== undefined) {
+        (lead as any)[field] = val;
       }
     }
 

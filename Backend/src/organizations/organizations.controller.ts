@@ -27,6 +27,7 @@ import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
 import { Permissions } from '../common/decorators/permissions.decorator';
+import { Public } from '../common/decorators/public.decorator';
 
 @ApiTags('Organizations')
 @Controller('organizations')
@@ -55,8 +56,9 @@ export class OrganizationsController {
   @ApiOperation({ summary: 'Get organization by ID' })
   @ApiResponse({ status: 200, description: 'Organization details' })
   @ApiResponse({ status: 404, description: 'Organization not found' })
-  async findById(@Param('id') id: string) {
-    return this.organizationsService.findById(id);
+  @ApiResponse({ status: 403, description: 'Not a member of this organization' })
+  async findById(@Param('id') id: string, @CurrentUser('_id') userId: string) {
+    return this.organizationsService.findByIdAndCheckMembership(id, userId);
   }
 
   @Patch(':id')
@@ -165,6 +167,7 @@ export class OrganizationsController {
 
   // Public invitation acceptance
   @Post('invitations/accept')
+  @Public()
   @ApiOperation({ summary: 'Accept invitation (public endpoint)' })
   @ApiResponse({ status: 200, description: 'Invitation accepted' })
   async acceptInvitation(@Body('token') token: string, @CurrentUser('_id') userId: string) {

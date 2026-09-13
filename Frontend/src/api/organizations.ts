@@ -54,4 +54,7 @@ export const organizationsApi = {
   // Settings
   getSettings: (id: string): Promise<ApiResponse<any>> =>
     api.get(`/organizations/${id}/settings`),
+
+  updateSettings: (id: string, data: Record<string, any>): Promise<ApiResponse<any>> =>
+    api.patch(`/organizations/${id}/settings`, data),
 };

@@ -95,7 +95,6 @@ export class ActivityService {
       this.activityModel
         .find({
           organizationId: new Types.ObjectId(organizationId),
-          userId: new Types.ObjectId(userId),
         })
         .populate('userId', 'firstName lastName avatar')
         .sort({ createdAt: -1 })
@@ -104,7 +103,6 @@ export class ActivityService {
         .exec(),
       this.activityModel.countDocuments({
         organizationId: new Types.ObjectId(organizationId),
-        userId: new Types.ObjectId(userId),
       }),
     ]);
 

@@ -92,6 +92,51 @@ export class StorageService {
     });
   }
 
+  async uploadBuffer(
+    buffer: Buffer,
+    fileName: string,
+    options: UploadOptions = {},
+  ): Promise<UploadResult> {
+    if (!this.configured) {
+      throw new BadRequestException('Cloudinary is not configured');
+    }
+
+    const { folder = 'clienthub', publicId, transformation, resourceType = 'raw' } = options;
+
+    return new Promise((resolve, reject) => {
+      const uploadOptions: any = {
+        folder,
+        resource_type: resourceType,
+        public_id: publicId || fileName.replace(/\.[^/.]+$/, ''),
+        overwrite: false,
+      };
+
+      if (transformation) {
+        uploadOptions.transformation = transformation;
+      }
+
+      const stream = cloudinary.uploader.upload_stream(uploadOptions, (error, result) => {
+        if (error) {
+          this.logger.error('Cloudinary buffer upload error:', error);
+          reject(new BadRequestException(`Upload failed: ${error.message}`));
+        } else if (result) {
+          resolve({
+            url: result.secure_url,
+            publicId: result.public_id,
+            width: result.width,
+            height: result.height,
+            format: result.format,
+            bytes: result.bytes,
+          });
+        } else {
+          reject(new BadRequestException('Upload failed: No result returned'));
+        }
+      });
+
+      stream.end(buffer);
+    });
+  }
+
   async uploadBase64(
     base64Data: string,
     options: UploadOptions = {},

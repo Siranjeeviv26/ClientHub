@@ -10,6 +10,7 @@ import { DashboardService } from './dashboard.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
+import { Permissions } from '../common/decorators/permissions.decorator';
 import { CurrentOrg } from '../common/decorators/current-org.decorator';
 
 @ApiTags('Dashboard')
@@ -20,6 +21,7 @@ export class DashboardController {
   constructor(private dashboardService: DashboardService) {}
 
   @Get('stats')
+  @Permissions('dashboard:read')
   @ApiOperation({ summary: 'Get dashboard summary stats' })
   @ApiResponse({ status: 200, description: 'Dashboard stats' })
   async getStats(@CurrentOrg() organizationId: string) {
@@ -27,6 +29,7 @@ export class DashboardController {
   }
 
   @Get('charts/client-growth')
+  @Permissions('dashboard:read')
   @ApiOperation({ summary: 'Get client growth chart data' })
   @ApiQuery({ name: 'months', required: false })
   @ApiResponse({ status: 200, description: 'Client growth data' })
@@ -35,6 +38,7 @@ export class DashboardController {
   }
 
   @Get('charts/lead-conversion')
+  @Permissions('dashboard:read')
   @ApiOperation({ summary: 'Get lead conversion chart data' })
   @ApiQuery({ name: 'months', required: false })
   @ApiResponse({ status: 200, description: 'Lead conversion data' })
@@ -43,6 +47,7 @@ export class DashboardController {
   }
 
   @Get('charts/sales-pipeline')
+  @Permissions('dashboard:read')
   @ApiOperation({ summary: 'Get sales pipeline chart data' })
   @ApiResponse({ status: 200, description: 'Sales pipeline data' })
   async getSalesPipeline(@CurrentOrg() organizationId: string) {
@@ -50,6 +55,7 @@ export class DashboardController {
   }
 
   @Get('charts/revenue')
+  @Permissions('dashboard:read')
   @ApiOperation({ summary: 'Get revenue overview chart data' })
   @ApiQuery({ name: 'months', required: false })
   @ApiResponse({ status: 200, description: 'Revenue data' })
@@ -58,6 +64,7 @@ export class DashboardController {
   }
 
   @Get('recent-activities')
+  @Permissions('dashboard:read', 'activities:read')
   @ApiOperation({ summary: 'Get recent activities' })
   @ApiQuery({ name: 'limit', required: false })
   @ApiResponse({ status: 200, description: 'Recent activities' })
@@ -66,6 +73,7 @@ export class DashboardController {
   }
 
   @Get('upcoming-followups')
+  @Permissions('dashboard:read')
   @ApiOperation({ summary: 'Get upcoming follow-ups' })
   @ApiQuery({ name: 'limit', required: false })
   @ApiResponse({ status: 200, description: 'Upcoming follow-ups' })
