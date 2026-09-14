@@ -21,6 +21,8 @@ import {
   Calendar,
   Receipt,
   CreditCard,
+  BarChart3,
+  ClipboardList,
 } from "lucide-react";
 
 import { useAuth } from "../contexts/AuthContext";
@@ -48,8 +50,16 @@ const navigation = [
 ];
 
 const adminNavigation = [
-  { name: "Users", href: "/users", icon: Users, roles: ["ADMIN", "MANAGER"] as const },
-  { name: "Roles", href: "/roles", icon: Shield, roles: ["ADMIN", "MANAGER"] as const },
+  { name: "Team", href: "/users", icon: Users, roles: ["ADMIN", "MANAGER"] as const },
+  { name: "Roles & Permissions", href: "/roles", icon: Shield, roles: ["ADMIN"] as const },
+  { name: "Reports", href: "/reports", icon: BarChart3, roles: ["ADMIN", "MANAGER"] as const },
+  { name: "Audit Logs", href: "/audit-logs", icon: ClipboardList, roles: ["ADMIN"] as const },
+  { name: "Subscription", href: "/settings/subscription", icon: CreditCard, roles: ["ADMIN"] as const },
+  { name: "Org Settings", href: "/settings/organization", icon: Settings, roles: ["ADMIN"] as const },
+];
+
+const superAdminNavigation = [
+  { name: "Super Admin Panel", href: "/admin", icon: Shield, roles: ["SUPER_ADMIN"] as const },
 ];
 
 const bottomNavigation = [
@@ -283,6 +293,45 @@ export function MainLayout() {
               )}
               <nav className="space-y-1" aria-label="Administration">
                 {adminNavigation
+                  .filter((item) => (item.roles as readonly string[]).includes(user?.role as string))
+                  .map((item) => {
+                    const isActive = location.pathname === item.href || (item.href !== '/' && location.pathname.startsWith(item.href));
+                    const Icon = item.icon;
+                    return (
+                      <NavLink
+                        key={item.name}
+                        to={item.href}
+                        aria-current={isActive ? 'page' : undefined}
+                        title={sidebarCollapsed ? item.name : undefined}
+                        onClick={() => setSidebarOpen(false)}
+                        className={clsx(
+                          'group flex items-center gap-3 rounded-xl text-[13.5px] font-medium transition-all duration-200',
+                          sidebarCollapsed ? 'justify-center p-1 bg-transparent text-gray-600' : 'px-2.5 py-2.5',
+                          !sidebarCollapsed && (isActive ? 'bg-primary-600 text-white shadow-sm shadow-primary-600/20' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'),
+                        )}
+                      >
+                        <span className={clsx('rounded-lg flex items-center justify-center transition-colors shrink-0', sidebarCollapsed ? 'w-9 h-9' : 'w-8 h-8', isActive ? (sidebarCollapsed ? 'bg-primary-600 text-white shadow-sm shadow-primary-600/20' : 'bg-white/15 text-white') : 'bg-white border border-gray-200 text-gray-500 group-hover:bg-gray-50 group-hover:border-gray-300 group-hover:text-gray-700')}>
+                          <Icon className="w-4 h-4" aria-hidden="true" />
+                        </span>
+                        {!sidebarCollapsed && <span className="truncate">{item.name}</span>}
+                        {!sidebarCollapsed && isActive && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-white/70 shrink-0" />}
+                      </NavLink>
+                    );
+                  })}
+              </nav>
+            </div>
+          )}
+
+          {/* Super Admin - visible to SUPER_ADMIN */}
+          {user?.role === 'SUPER_ADMIN' && (
+            <div>
+              {!sidebarCollapsed && (
+                <p className="px-2 mb-2 text-[11px] font-semibold tracking-widest uppercase text-gray-400">
+                  Platform
+                </p>
+              )}
+              <nav className="space-y-1" aria-label="Super Admin">
+                {superAdminNavigation
                   .filter((item) => (item.roles as readonly string[]).includes(user?.role as string))
                   .map((item) => {
                     const isActive = location.pathname === item.href || (item.href !== '/' && location.pathname.startsWith(item.href));

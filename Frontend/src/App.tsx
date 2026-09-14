@@ -95,6 +95,51 @@ const PaymentsPage = lazy(() =>
     default: m.PaymentsPage,
   })),
 );
+const ReportsPage = lazy(() =>
+  import("./features/reports/ReportsPage").then((m) => ({
+    default: m.ReportsPage,
+  })),
+);
+const AuditLogsPage = lazy(() =>
+  import("./features/audit-logs/AuditLogsPage").then((m) => ({
+    default: m.AuditLogsPage,
+  })),
+);
+const SubscriptionPage = lazy(() =>
+  import("./features/billing/SubscriptionPage").then((m) => ({
+    default: m.SubscriptionPage,
+  })),
+);
+const OrganizationSettings = lazy(() =>
+  import("./features/settings/OrganizationSettings").then((m) => ({
+    default: m.OrganizationSettings,
+  })),
+);
+const SuperAdminLayout = lazy(() =>
+  import("./features/super-admin/SuperAdminLayout").then((m) => ({
+    default: m.default,
+  })),
+);
+const SuperAdminDashboard = lazy(() =>
+  import("./features/super-admin/SuperAdminDashboard").then((m) => ({
+    default: m.default,
+  })),
+);
+const SuperAdminOrganizations = lazy(() =>
+  import("./features/super-admin/OrganizationsPage").then((m) => ({
+    default: m.default,
+  })),
+);
+const SuperAdminUsers = lazy(() =>
+  import("./features/super-admin/UsersPage").then((m) => ({
+    default: m.default,
+  })),
+);
+const SuperAdminSubscriptions = lazy(() =>
+  import("./features/super-admin/SubscriptionsPage").then((m) => ({
+    default: m.default,
+  })),
+);
 
 const LoginPage = lazy(() =>
   import("./features/auth/LoginPage").then((m) => ({ default: m.LoginPage })),
@@ -121,7 +166,7 @@ const VerifyEmailPage = lazy(() =>
 );
 
 function ProtectedRoute() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
 
   if (isLoading) {
     return (
@@ -133,6 +178,10 @@ function ProtectedRoute() {
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
+  }
+
+  if (user?.role === 'SUPER_ADMIN' && window.location.pathname !== '/admin' && !window.location.pathname.startsWith('/admin/')) {
+    return <Navigate to="/admin" replace />;
   }
 
   return <Outlet />;
@@ -416,7 +465,71 @@ function App() {
                     </ErrorBoundary>
                   }
                 />
+                <Route
+                  path="/reports"
+                  element={
+                    <ErrorBoundary>
+                      <ReportsPage />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/audit-logs"
+                  element={
+                    <ErrorBoundary>
+                      <AuditLogsPage />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/settings/subscription"
+                  element={
+                    <ErrorBoundary>
+                      <SubscriptionPage />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/settings/organization"
+                  element={
+                    <ErrorBoundary>
+                      <OrganizationSettings />
+                    </ErrorBoundary>
+                  }
+                />
               </Route>
+            </Route>
+          </Route>
+        </Route>
+
+        {/* Super Admin Routes */}
+        <Route element={<ProtectedRoute />}>
+          <Route element={<RoleRoute allowed={['SUPER_ADMIN']} />}>
+            <Route path="/admin" element={
+              <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><LoadingSpinner size="lg" /></div>}>
+                <SuperAdminLayout />
+              </Suspense>
+            }>
+              <Route index element={
+                <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><LoadingSpinner size="lg" /></div>}>
+                  <SuperAdminDashboard />
+                </Suspense>
+              } />
+              <Route path="organizations" element={
+                <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><LoadingSpinner size="lg" /></div>}>
+                  <SuperAdminOrganizations />
+                </Suspense>
+              } />
+              <Route path="users" element={
+                <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><LoadingSpinner size="lg" /></div>}>
+                  <SuperAdminUsers />
+                </Suspense>
+              } />
+              <Route path="subscriptions" element={
+                <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><LoadingSpinner size="lg" /></div>}>
+                  <SuperAdminSubscriptions />
+                </Suspense>
+              } />
             </Route>
           </Route>
         </Route>

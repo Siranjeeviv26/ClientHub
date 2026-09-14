@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { MongooseModule } from '@nestjs/mongoose';
+import { APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import configuration from './config/configuration';
 import { validationSchema } from './config/validation.schema';
@@ -27,6 +29,13 @@ import { CommunicationsModule } from './communications/communications.module';
 import { ProposalsModule } from './proposals/proposals.module';
 import { InvoicesModule } from './invoices/invoices.module';
 import { PaymentsModule } from './payments/payments.module';
+import { AuditLogsModule } from './audit-logs/audit-logs.module';
+import { AuditLog, AuditLogSchema } from './audit-logs/schemas/audit-log.schema';
+import { AuditLogInterceptor } from './audit-logs/audit-log.interceptor';
+import { UsageModule } from './usage/usage.module';
+import { BillingModule } from './billing/billing.module';
+import { ReportsModule } from './reports/reports.module';
+import { SuperAdminModule } from './super-admin/super-admin.module';
 
 @Module({
   imports: [
@@ -48,6 +57,9 @@ import { PaymentsModule } from './payments/payments.module';
       }) as any,
       inject: [ConfigService],
     }),
+    MongooseModule.forFeature([
+      { name: AuditLog.name, schema: AuditLogSchema },
+    ]),
     DatabaseModule,
     QueueModule,
     QueueWorkerModule,
@@ -72,7 +84,17 @@ import { PaymentsModule } from './payments/payments.module';
     ProposalsModule,
     InvoicesModule,
     PaymentsModule,
+    AuditLogsModule,
+    UsageModule,
+    BillingModule,
+    ReportsModule,
+    SuperAdminModule,
   ],
-  providers: [],
+  providers: [
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: AuditLogInterceptor,
+    },
+  ],
 })
 export class AppModule {}

@@ -39,6 +39,36 @@ export class CreatePlanDto {
   @Min(1)
   memberLimit?: number;
 
+  @ApiPropertyOptional({ example: 500, description: 'Maximum clients allowed' })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  clientLimit?: number;
+
+  @ApiPropertyOptional({ example: 1000, description: 'Maximum leads allowed' })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  leadLimit?: number;
+
+  @ApiPropertyOptional({ example: 200, description: 'Maximum deals allowed' })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  dealLimit?: number;
+
+  @ApiPropertyOptional({ example: 5368709120, description: 'Storage limit in bytes (5GB default)' })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  storageLimit?: number;
+
+  @ApiPropertyOptional({ example: 1000, description: 'Monthly email send limit' })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  monthlyEmailLimit?: number;
+
   @ApiPropertyOptional({ example: ['5 workspaces', 'Up to 50 members'] })
   @IsOptional()
   @IsArray()
@@ -95,6 +125,36 @@ export class UpdatePlanDto {
   @IsInt()
   @Min(1)
   memberLimit?: number;
+
+  @ApiPropertyOptional({ example: 500 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  clientLimit?: number;
+
+  @ApiPropertyOptional({ example: 1000 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  leadLimit?: number;
+
+  @ApiPropertyOptional({ example: 200 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  dealLimit?: number;
+
+  @ApiPropertyOptional({ example: 5368709120 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  storageLimit?: number;
+
+  @ApiPropertyOptional({ example: 1000 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  monthlyEmailLimit?: number;
 
   @ApiPropertyOptional()
   @IsOptional()

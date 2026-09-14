@@ -1,0 +1,27 @@
+import api from '../services/api';
+
+export const billingApi = {
+  getSubscriptionStatus: () =>
+    api.get('/billing/subscription/status'),
+
+  startTrial: (planSlug: string) =>
+    api.post('/billing/subscription/trial', { planSlug }),
+
+  createSubscription: (planSlug: string, paymentMethodId?: string) =>
+    api.post('/billing/subscription', { planSlug, paymentMethodId }),
+
+  upgradePlan: (planSlug: string) =>
+    api.post('/billing/subscription/upgrade', { planSlug }),
+
+  downgradePlan: (planSlug: string) =>
+    api.post('/billing/subscription/downgrade', { planSlug }),
+
+  cancelSubscription: () =>
+    api.post('/billing/subscription/cancel'),
+
+  getUsage: () =>
+    api.get('/usage'),
+
+  checkLimit: (type: string) =>
+    api.get('/usage/check', { params: { type } }),
+};

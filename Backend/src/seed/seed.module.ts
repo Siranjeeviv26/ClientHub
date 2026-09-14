@@ -18,6 +18,8 @@ import { Payment, PaymentSchema } from '../payments/schemas/payment.schema';
 import { Communication, CommunicationSchema } from '../communications/schemas/communication.schema';
 import { CalendarEvent, EventSchema } from '../events/schemas/event.schema';
 import { Documents, DocumentsSchema } from '../documents/schemas/document.schema';
+import { CustomRole, CustomRoleSchema } from '../roles/schemas/role.schema';
+import { RolesModule } from '../roles/roles.module';
 
 @Module({
   imports: [
@@ -37,7 +39,9 @@ import { Documents, DocumentsSchema } from '../documents/schemas/document.schema
       { name: Communication.name, schema: CommunicationSchema },
       { name: CalendarEvent.name, schema: EventSchema },
       { name: Documents.name, schema: DocumentsSchema },
+      { name: CustomRole.name, schema: CustomRoleSchema },
     ]),
+    RolesModule,
   ],
   controllers: [SeedController],
   providers: [SeedService],

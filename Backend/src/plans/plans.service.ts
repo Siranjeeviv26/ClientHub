@@ -39,6 +39,10 @@ export class PlansService {
     return plan;
   }
 
+  async findBySlug(slug: string): Promise<PlanDocument | null> {
+    return this.planModel.findOne({ slug }).exec();
+  }
+
   async create(dto: CreatePlanDto): Promise<PlanDocument> {
     const slug = dto.slug || this.slugify(dto.name);
     const existing = await this.planModel.findOne({ slug });

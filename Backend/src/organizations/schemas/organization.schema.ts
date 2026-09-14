@@ -37,6 +37,18 @@ export class Organization extends BaseDocument {
       taskDueSoon?: boolean;
       dealUpdated?: boolean;
     };
+    invoice?: {
+      prefix?: string;
+      nextNumber?: number;
+      defaultTaxRate?: number;
+      paymentTerms?: number;
+    };
+    security?: {
+      passwordMinLength?: number;
+      requireUppercase?: boolean;
+      requireNumbers?: boolean;
+      sessionTimeout?: number;
+    };
   };
 
   @Prop({ type: Object, default: {} })
@@ -45,6 +57,12 @@ export class Organization extends BaseDocument {
     status?: string;
     trialEndsAt?: Date;
     billingEmail?: string;
+    currentPeriodStart?: Date;
+    currentPeriodEnd?: Date;
+    cancelAtPeriodEnd?: boolean;
+    paymentProvider?: string;
+    paymentSubscriptionId?: string;
+    paymentCustomerId?: string;
   };
 }
 
