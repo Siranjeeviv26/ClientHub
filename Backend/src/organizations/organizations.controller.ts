@@ -28,6 +28,8 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { Public } from '../common/decorators/public.decorator';
+import { CheckPlanRole } from '../billing/decorators/require-plan-role.decorator';
+import { PlanRoleGuard } from '../billing/guards/plan-role.guard';
 
 @ApiTags('Organizations')
 @Controller('organizations')
@@ -94,6 +96,8 @@ export class OrganizationsController {
 
   @Post(':id/members/invite')
   @Permissions('members:invite')
+  @UseGuards(PlanRoleGuard)
+  @CheckPlanRole()
   @ApiOperation({ summary: 'Invite a new member' })
   @ApiResponse({ status: 201, description: 'Invitation sent' })
   async inviteMember(
@@ -106,6 +110,8 @@ export class OrganizationsController {
 
   @Patch(':id/members/:userId')
   @Permissions('members:role:assign')
+  @UseGuards(PlanRoleGuard)
+  @CheckPlanRole()
   @ApiOperation({ summary: 'Update member role' })
   @ApiResponse({ status: 200, description: 'Member role updated' })
   async updateMember(

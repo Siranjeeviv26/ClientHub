@@ -143,7 +143,7 @@ export function MainLayout() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="h-screen overflow-hidden bg-gray-50">
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
         <div

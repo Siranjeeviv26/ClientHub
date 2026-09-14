@@ -1,20 +1,22 @@
-import { Controller, Get, Post, Patch, Param, Query, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Query, Body, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { SuperAdminGuard } from './guards/super-admin.guard';
 import { SuperAdminService } from './super-admin.service';
-import { CreateOrganizationDto } from '../organizations/dto/create-organization.dto';
+import { CreateOrganizationWithAdminDto } from './dto/create-organization.dto';
+import { CreatePlanDto, UpdatePlanDto } from '../plans/dto/plan.dto';
 
 @ApiTags('Super Admin')
 @ApiBearerAuth('access-token')
 @Controller('super-admin')
-@UseGuards(SuperAdminGuard)
+@UseGuards(JwtAuthGuard, SuperAdminGuard)
 export class SuperAdminController {
   constructor(private readonly superAdminService: SuperAdminService) {}
 
   // Organizations
   @Post('organizations')
-  @ApiOperation({ summary: 'Create a new organization (super admin)' })
-  async createOrganization(@Body() dto: CreateOrganizationDto) {
+  @ApiOperation({ summary: 'Create a new organization with admin user (super admin)' })
+  async createOrganization(@Body() dto: CreateOrganizationWithAdminDto) {
     return this.superAdminService.createOrganization(dto);
   }
 
@@ -91,12 +93,14 @@ export class SuperAdminController {
   @ApiQuery({ name: 'page', required: false })
   @ApiQuery({ name: 'limit', required: false })
   @ApiQuery({ name: 'status', required: false })
+  @ApiQuery({ name: 'search', required: false })
   async getAllSubscriptions(
     @Query('page') page?: number,
     @Query('limit') limit?: number,
     @Query('status') status?: string,
+    @Query('search') search?: string,
   ) {
-    return this.superAdminService.getAllSubscriptions({ page: page ? Number(page) : 1, limit: limit ? Number(limit) : 20, status });
+    return this.superAdminService.getAllSubscriptions({ page: page ? Number(page) : 1, limit: limit ? Number(limit) : 20, status, search });
   }
 
   @Get('subscriptions/:orgId')
@@ -119,6 +123,30 @@ export class SuperAdminController {
     return this.superAdminService.getAllPlans();
   }
 
+  @Post('plans')
+  @ApiOperation({ summary: 'Create a new plan' })
+  async createPlan(@Body() dto: CreatePlanDto) {
+    return this.superAdminService.createPlan(dto);
+  }
+
+  @Patch('plans/:id')
+  @ApiOperation({ summary: 'Update a plan' })
+  async updatePlan(@Param('id') id: string, @Body() dto: UpdatePlanDto) {
+    return this.superAdminService.updatePlan(id, dto);
+  }
+
+  @Delete('plans/:id')
+  @ApiOperation({ summary: 'Delete a plan' })
+  async deletePlan(@Param('id') id: string) {
+    return this.superAdminService.deletePlan(id);
+  }
+
+  @Post('plans/:planId/assign/:orgId')
+  @ApiOperation({ summary: 'Assign a plan to an organization' })
+  async assignPlan(@Param('planId') planId: string, @Param('orgId') orgId: string) {
+    return this.superAdminService.assignPlanToOrganization(planId, orgId);
+  }
+
   // Audit Logs (platform-wide)
   @Get('audit-logs')
   @ApiOperation({ summary: 'Get platform-wide audit logs' })
@@ -137,5 +165,41 @@ export class SuperAdminController {
     @Query('endDate') endDate?: string,
   ) {
     return this.superAdminService.getPlatformAuditLogs({ page: page ? Number(page) : 1, limit: limit ? Number(limit) : 20, action, entity, startDate, endDate });
+  }
+
+  // Payments (platform-wide)
+  @Get('payments')
+  @ApiOperation({ summary: 'Get all payments platform-wide' })
+  @ApiQuery({ name: 'page', required: false })
+  @ApiQuery({ name: 'limit', required: false })
+  @ApiQuery({ name: 'status', required: false })
+  @ApiQuery({ name: 'search', required: false })
+  async getAllPayments(
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('status') status?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.superAdminService.getAllPayments({ page: page ? Number(page) : 1, limit: limit ? Number(limit) : 20, status, search });
+  }
+
+  // Analytics
+  @Get('analytics')
+  @ApiOperation({ summary: 'Get platform analytics' })
+  async getAnalytics() {
+    return this.superAdminService.getPlatformAnalytics();
+  }
+
+  // System Settings
+  @Get('settings')
+  @ApiOperation({ summary: 'Get system settings' })
+  async getSettings() {
+    return this.superAdminService.getSystemSettings();
+  }
+
+  @Patch('settings')
+  @ApiOperation({ summary: 'Update system settings' })
+  async updateSettings(@Body() dto: any) {
+    return this.superAdminService.updateSystemSettings(dto);
   }
 }

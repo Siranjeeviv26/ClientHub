@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException, ConflictException, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
+import * as bcrypt from 'bcryptjs';
 import { Organization, OrganizationDocument } from '../organizations/schemas/organization.schema';
 import { User, UserDocument } from '../auth/schemas/user.schema';
 import { Plan, PlanDocument } from '../plans/schemas/plan.schema';
@@ -9,6 +10,7 @@ import { Client, ClientDocument } from '../clients/schemas/client.schema';
 import { Deal, DealDocument } from '../deals/schemas/deal.schema';
 import { Lead, LeadDocument } from '../leads/schemas/lead.schema';
 import { Payment, PaymentDocument } from '../payments/schemas/payment.schema';
+import { SystemSettings, SystemSettingsDocument } from './schemas/system-settings.schema';
 
 @Injectable()
 export class SuperAdminService {
@@ -23,14 +25,27 @@ export class SuperAdminService {
     @InjectModel(Deal.name) private dealModel: Model<DealDocument>,
     @InjectModel(Lead.name) private leadModel: Model<LeadDocument>,
     @InjectModel(Payment.name) private paymentModel: Model<PaymentDocument>,
+    @InjectModel(SystemSettings.name) private settingsModel: Model<SystemSettingsDocument>,
   ) {}
 
   // Organizations
-  async createOrganization(dto: { name: string; slug?: string }) {
+  async createOrganization(dto: {
+    name: string;
+    slug?: string;
+    adminEmail: string;
+    adminFirstName: string;
+    adminLastName: string;
+    adminPassword: string;
+  }) {
     const slug = dto.slug || dto.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
     const existingSlug = await this.organizationModel.findOne({ slug });
     if (existingSlug) {
       throw new ConflictException('Organization slug already exists');
+    }
+
+    const existingEmail = await this.userModel.findOne({ email: dto.adminEmail.toLowerCase() });
+    if (existingEmail) {
+      throw new ConflictException('Admin email already registered');
     }
 
     const organization = await this.organizationModel.create({
@@ -46,8 +61,25 @@ export class SuperAdminService {
       },
     });
 
-    this.logger.log(`Organization created by super admin: ${organization.name} (${organization.slug})`);
-    return organization;
+    const passwordHash = await bcrypt.hash(dto.adminPassword, 12);
+    const adminUser = await this.userModel.create({
+      email: dto.adminEmail.toLowerCase(),
+      passwordHash,
+      firstName: dto.adminFirstName,
+      lastName: dto.adminLastName,
+      role: 'ADMIN',
+      organizationId: organization._id,
+      isActive: true,
+      emailVerified: true,
+    });
+
+    this.logger.log(`Organization created by super admin: ${organization.name} (${organization.slug}) with admin ${adminUser.email}`);
+
+    return {
+      organization: { _id: organization._id, name: organization.name, slug: organization.slug },
+      admin: { _id: adminUser._id, email: adminUser.email, firstName: adminUser.firstName, lastName: adminUser.lastName, role: adminUser.role },
+      temporaryPassword: dto.adminPassword,
+    };
   }
 
   async getAllOrganizations(query: { page?: number; limit?: number; search?: string; status?: string }) {
@@ -152,7 +184,7 @@ export class SuperAdminService {
   }
 
   // Subscriptions
-  async getAllSubscriptions(query: { page?: number; limit?: number; status?: string }) {
+  async getAllSubscriptions(query: { page?: number; limit?: number; status?: string; search?: string }) {
     const page = Math.max(1, query.page || 1);
     const limit = Math.min(100, Math.max(1, query.limit || 20));
     const skip = (page - 1) * limit;
@@ -160,6 +192,12 @@ export class SuperAdminService {
     const filter: Record<string, any> = {};
     if (query.status) {
       filter['subscription.status'] = query.status;
+    }
+    if (query.search) {
+      filter.$or = [
+        { name: { $regex: query.search, $options: 'i' } },
+        { slug: { $regex: query.search, $options: 'i' } },
+      ];
     }
 
     const [items, total] = await Promise.all([
@@ -291,5 +329,122 @@ export class SuperAdminService {
   // Plans management
   async getAllPlans() {
     return this.planModel.find().sort({ sortOrder: 1, price: 1 }).lean().exec();
+  }
+
+  async createPlan(dto: any) {
+    const slug = dto.slug || dto.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    const existing = await this.planModel.findOne({ slug });
+    if (existing) {
+      throw new ConflictException('Plan slug already exists');
+    }
+    const plan = await this.planModel.create({ ...dto, slug });
+    this.logger.log(`Plan created by super admin: ${plan.name} (${plan.slug})`);
+    return plan;
+  }
+
+  async updatePlan(id: string, dto: any) {
+    const plan = await this.planModel.findById(id);
+    if (!plan) throw new NotFoundException('Plan not found');
+    if (dto.slug && dto.slug !== plan.slug) {
+      const existing = await this.planModel.findOne({ slug: dto.slug, _id: { $ne: id } });
+      if (existing) throw new ConflictException('Plan slug already exists');
+    }
+    Object.assign(plan, dto);
+    await plan.save();
+    this.logger.log(`Plan updated by super admin: ${plan.name}`);
+    return plan;
+  }
+
+  async deletePlan(id: string) {
+    const plan = await this.planModel.findById(id);
+    if (!plan) throw new NotFoundException('Plan not found');
+    await this.organizationModel.updateMany(
+      { 'subscription.plan': plan.slug },
+      { $unset: { 'subscription.plan': 1, 'subscription.status': 1 } },
+    );
+    await this.planModel.findByIdAndDelete(id);
+    this.logger.log(`Plan deleted by super admin: ${plan.name}`);
+  }
+
+  async assignPlanToOrganization(planId: string, organizationId: string) {
+    const plan = await this.planModel.findById(planId);
+    if (!plan) throw new NotFoundException('Plan not found');
+    const org = await this.organizationModel.findById(organizationId);
+    if (!org) throw new NotFoundException('Organization not found');
+
+    org.subscription = {
+      ...(org.subscription as any),
+      plan: plan.slug,
+      status: 'active',
+      currentPeriodStart: new Date(),
+      currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+    };
+    if (plan.memberLimit) {
+      org.maxMembers = plan.memberLimit;
+    }
+    await org.save();
+    this.logger.log(`Plan ${plan.slug} assigned to organization ${org.name} by super admin`);
+    return org;
+  }
+
+  // Platform-wide Payments
+  async getAllPayments(query: { page?: number; limit?: number; status?: string; search?: string }) {
+    const page = Math.max(1, query.page || 1);
+    const limit = Math.min(100, Math.max(1, query.limit || 20));
+    const skip = (page - 1) * limit;
+
+    const filter: Record<string, any> = {};
+    if (query.status) filter.status = query.status;
+    if (query.search) {
+      filter.$or = [
+        { paymentNumber: { $regex: query.search, $options: 'i' } },
+        { transactionId: { $regex: query.search, $options: 'i' } },
+        { reference: { $regex: query.search, $options: 'i' } },
+      ];
+    }
+
+    const [items, total] = await Promise.all([
+      this.paymentModel
+        .find(filter)
+        .populate('organizationId', 'name slug')
+        .populate('invoiceId', 'invoiceNumber')
+        .populate('clientId', 'firstName lastName company')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean()
+        .exec(),
+      this.paymentModel.countDocuments(filter).exec(),
+    ]);
+
+    return {
+      items,
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit), hasNextPage: page < Math.ceil(total / limit), hasPrevPage: page > 1 },
+    };
+  }
+
+  // System Settings
+  async getSystemSettings() {
+    const settings = await this.settingsModel.findOne().lean().exec();
+    if (settings) return settings;
+    return this.settingsModel.create({
+      platformName: 'ClientHub',
+      supportEmail: '',
+      maintenanceMode: false,
+      defaultPlan: 'free',
+      features: {},
+      limits: {},
+    });
+  }
+
+  async updateSystemSettings(dto: Partial<{ platformName: string; supportEmail: string; maintenanceMode: boolean; defaultPlan: string; features: Record<string, boolean>; limits: Record<string, number> }>) {
+    let settings = await this.settingsModel.findOne().exec();
+    if (!settings) {
+      return this.settingsModel.create({ ...dto });
+    }
+    Object.assign(settings, dto);
+    await settings.save();
+    this.logger.log('System settings updated by super admin');
+    return settings;
   }
 }

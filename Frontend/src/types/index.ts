@@ -63,7 +63,7 @@ export interface OrganizationSettings {
   };
 }
 
-export type SubscriptionStatus = 'trial' | 'active' | 'past_due' | 'cancelled' | 'expired';
+export type SubscriptionStatus = 'trialing' | 'active' | 'past_due' | 'cancelled' | 'expired' | 'suspended';
 
 export interface OrganizationSubscription {
   plan?: string;
@@ -514,8 +514,12 @@ export interface Plan {
   storageLimit: number;
   monthlyEmailLimit: number;
   features: string[];
+  allowedRoles: string[];
+  permissions: Record<string, string[]>;
   isActive: boolean;
   sortOrder: number;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface PlatformAnalytics {
@@ -538,7 +542,7 @@ export interface SuperAdminOrganization {
   slug: string;
   maxMembers?: number;
   subscription?: { plan?: string; status?: string; currentPeriodEnd?: string };
-  createdAt: string;
+  createdAt?: string;
 }
 
 export interface SuperAdminPaginatedResponse<T> {
@@ -573,4 +577,30 @@ export interface SubscriptionStatusResponse {
   currentPeriodEnd?: string;
   cancelAtPeriodEnd?: boolean;
   usage: UsageData;
+}
+
+export interface SuperAdminPayment {
+  _id: string;
+  paymentNumber: string;
+  amount: number;
+  status: string;
+  method: string;
+  transactionId?: string;
+  reference?: string;
+  notes?: string;
+  paidAt?: string;
+  createdAt: string;
+  organizationId?: { _id: string; name: string; slug: string };
+  invoiceId?: { _id: string; invoiceNumber: string };
+  clientId?: { _id: string; firstName: string; lastName: string; company?: string };
+}
+
+export interface SystemSettingsData {
+  _id: string;
+  platformName: string;
+  supportEmail: string;
+  maintenanceMode: boolean;
+  defaultPlan: string;
+  features: Record<string, boolean>;
+  limits: Record<string, number>;
 }

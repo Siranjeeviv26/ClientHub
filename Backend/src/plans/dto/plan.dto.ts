@@ -1,4 +1,4 @@
-import { IsString, MinLength, MaxLength, Matches, IsOptional, IsNumber, Min, IsArray, IsBoolean, IsInt } from 'class-validator';
+import { IsString, MinLength, MaxLength, Matches, IsOptional, IsNumber, Min, IsArray, IsBoolean, IsInt, IsObject } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreatePlanDto {
@@ -74,6 +74,17 @@ export class CreatePlanDto {
   @IsArray()
   @IsString({ each: true })
   features?: string[];
+
+  @ApiPropertyOptional({ example: ['ADMIN', 'MANAGER', 'SALES', 'EMPLOYEE'], description: 'Roles that organizations on this plan can assign' })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  allowedRoles?: string[];
+
+  @ApiPropertyOptional({ example: { MANAGER: ['reports:read', 'reports:export'], SALES: ['deals:read'] }, description: 'Additional permissions per role beyond the base set' })
+  @IsOptional()
+  @IsObject()
+  permissions?: Record<string, string[]>;
 
   @ApiPropertyOptional({ example: true })
   @IsOptional()
@@ -161,6 +172,17 @@ export class UpdatePlanDto {
   @IsArray()
   @IsString({ each: true })
   features?: string[];
+
+  @ApiPropertyOptional({ description: 'Roles that organizations on this plan can assign' })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  allowedRoles?: string[];
+
+  @ApiPropertyOptional({ description: 'Additional permissions per role beyond the base set' })
+  @IsOptional()
+  @IsObject()
+  permissions?: Record<string, string[]>;
 
   @ApiPropertyOptional({ example: true })
   @IsOptional()

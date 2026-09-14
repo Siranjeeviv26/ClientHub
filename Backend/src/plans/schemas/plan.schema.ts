@@ -41,6 +41,12 @@ export class Plan {
   @Prop({ type: [String], default: [] })
   features: string[];
 
+  @Prop({ type: [String], default: ['ADMIN', 'EMPLOYEE'] })
+  allowedRoles: string[];
+
+  @Prop({ type: Object, default: {} })
+  permissions: Record<string, string[]>;
+
   @Prop({ default: true, index: true })
   isActive: boolean;
 

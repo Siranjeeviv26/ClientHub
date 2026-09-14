@@ -10,6 +10,7 @@ import { Client, ClientSchema } from '../clients/schemas/client.schema';
 import { Deal, DealSchema } from '../deals/schemas/deal.schema';
 import { Lead, LeadSchema } from '../leads/schemas/lead.schema';
 import { Payment, PaymentSchema } from '../payments/schemas/payment.schema';
+import { SystemSettings, SystemSettingsSchema } from './schemas/system-settings.schema';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { Payment, PaymentSchema } from '../payments/schemas/payment.schema';
       { name: Deal.name, schema: DealSchema },
       { name: Lead.name, schema: LeadSchema },
       { name: Payment.name, schema: PaymentSchema },
+      { name: SystemSettings.name, schema: SystemSettingsSchema },
     ]),
   ],
   controllers: [SuperAdminController],

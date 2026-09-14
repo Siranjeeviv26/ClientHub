@@ -97,7 +97,7 @@ const PaymentsPage = lazy(() =>
 );
 const ReportsPage = lazy(() =>
   import("./features/reports/ReportsPage").then((m) => ({
-    default: m.ReportsPage,
+    default: m.default,
   })),
 );
 const AuditLogsPage = lazy(() =>
@@ -107,7 +107,7 @@ const AuditLogsPage = lazy(() =>
 );
 const SubscriptionPage = lazy(() =>
   import("./features/billing/SubscriptionPage").then((m) => ({
-    default: m.SubscriptionPage,
+    default: m.default,
   })),
 );
 const OrganizationSettings = lazy(() =>
@@ -137,6 +137,31 @@ const SuperAdminUsers = lazy(() =>
 );
 const SuperAdminSubscriptions = lazy(() =>
   import("./features/super-admin/SubscriptionsPage").then((m) => ({
+    default: m.default,
+  })),
+);
+const SuperAdminPlans = lazy(() =>
+  import("./features/super-admin/PlansPage").then((m) => ({
+    default: m.default,
+  })),
+);
+const SuperAdminAuditLogs = lazy(() =>
+  import("./features/super-admin/AuditLogsPage").then((m) => ({
+    default: m.default,
+  })),
+);
+const SuperAdminPayments = lazy(() =>
+  import("./features/super-admin/PaymentsPage").then((m) => ({
+    default: m.default,
+  })),
+);
+const SuperAdminPlatformAnalytics = lazy(() =>
+  import("./features/super-admin/PlatformAnalyticsPage").then((m) => ({
+    default: m.default,
+  })),
+);
+const SuperAdminSystemSettings = lazy(() =>
+  import("./features/super-admin/SystemSettingsPage").then((m) => ({
     default: m.default,
   })),
 );
@@ -528,6 +553,31 @@ function App() {
               <Route path="subscriptions" element={
                 <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><LoadingSpinner size="lg" /></div>}>
                   <SuperAdminSubscriptions />
+                </Suspense>
+              } />
+              <Route path="plans" element={
+                <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><LoadingSpinner size="lg" /></div>}>
+                  <SuperAdminPlans />
+                </Suspense>
+              } />
+              <Route path="audit-logs" element={
+                <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><LoadingSpinner size="lg" /></div>}>
+                  <SuperAdminAuditLogs />
+                </Suspense>
+              } />
+              <Route path="payments" element={
+                <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><LoadingSpinner size="lg" /></div>}>
+                  <SuperAdminPayments />
+                </Suspense>
+              } />
+              <Route path="analytics" element={
+                <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><LoadingSpinner size="lg" /></div>}>
+                  <SuperAdminPlatformAnalytics />
+                </Suspense>
+              } />
+              <Route path="settings" element={
+                <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><LoadingSpinner size="lg" /></div>}>
+                  <SuperAdminSystemSettings />
                 </Suspense>
               } />
             </Route>
