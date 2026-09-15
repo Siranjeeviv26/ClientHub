@@ -189,6 +189,11 @@ const VerifyEmailPage = lazy(() =>
     default: m.VerifyEmailPage,
   })),
 );
+const LandingPage = lazy(() =>
+  import("./features/landing/LandingPage").then((m) => ({
+    default: m.default,
+  })),
+);
 
 function ProtectedRoute() {
   const { isAuthenticated, isLoading, user } = useAuth();
@@ -242,7 +247,7 @@ function PublicRoute() {
   }
 
   if (isAuthenticated) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/dashboard" replace />;
   }
 
   return <Outlet />;
@@ -260,7 +265,7 @@ function RoleRoute({ allowed }: { allowed: string[] }) {
   }
 
   if (!user || !allowed.includes(user.role as string)) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/dashboard" replace />;
   }
 
   return <Outlet />;
@@ -270,6 +275,13 @@ function App() {
   return (
     <ErrorBoundary>
       <Routes>
+        {/* Landing Page - no layout wrapper */}
+        <Route path="/" element={
+          <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><LoadingSpinner size="lg" /></div>}>
+            <LandingPage />
+          </Suspense>
+        } />
+
         {/* Auth Routes */}
         <Route element={<AuthLayout />}>
           <Route element={<PublicRoute />}>
@@ -330,7 +342,7 @@ function App() {
             />
             <Route element={<OrganizationRoute />}>
               <Route
-                path="/"
+                path="/dashboard"
                 element={
                   <ErrorBoundary>
                     <DashboardPage />
@@ -522,9 +534,9 @@ function App() {
                     </ErrorBoundary>
                   }
                 />
-              </Route>
-            </Route>
           </Route>
+        </Route>
+        </Route>
         </Route>
 
         {/* Super Admin Routes */}
@@ -585,7 +597,7 @@ function App() {
         </Route>
 
         {/* Catch all */}
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </ErrorBoundary>
   );

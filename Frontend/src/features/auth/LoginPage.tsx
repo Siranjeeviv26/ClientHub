@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Mail, Lock, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 import { useAuth } from '../../contexts/AuthContext';
@@ -29,10 +29,7 @@ export function LoginPage() {
     formState: { errors },
   } = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
-    defaultValues: {
-      email: '',
-      password: '',
-    },
+    defaultValues: { email: '', password: '' },
   });
 
   const onSubmit = async (data: LoginForm) => {
@@ -50,17 +47,17 @@ export function LoginPage() {
 
   return (
     <div>
-      <div className="text-center mb-8">
-        <h2 className="text-2xl font-bold text-gray-900">Welcome back</h2>
-        <p className="mt-2 text-gray-600">Sign in to your ClientHub account</p>
+      <div className="text-center mb-6">
+        <h2 className="text-xl font-bold text-gray-900">Welcome back</h2>
+        <p className="mt-1.5 text-sm text-gray-500">Sign in to your account</p>
       </div>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" noValidate>
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
         <Input
           label="Email"
           type="email"
           placeholder="you@company.com"
-          leftIcon={<Mail className="w-5 h-5" />}
+          leftIcon={<Mail className="w-4 h-4" />}
           error={errors.email?.message}
           {...register('email')}
           autoComplete="email"
@@ -72,7 +69,7 @@ export function LoginPage() {
             label="Password"
             type={showPassword ? 'text' : 'password'}
             placeholder="••••••••"
-            leftIcon={<Lock className="w-5 h-5" />}
+            leftIcon={<Lock className="w-4 h-4" />}
             rightIcon={
               <button
                 type="button"
@@ -80,7 +77,7 @@ export function LoginPage() {
                 className="text-gray-400 hover:text-gray-600"
                 aria-label={showPassword ? 'Hide password' : 'Show password'}
               >
-                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             }
             error={errors.password?.message}
@@ -92,30 +89,25 @@ export function LoginPage() {
 
         <div className="flex items-center justify-between">
           <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-            />
-            <span className="text-sm text-gray-600">Remember me</span>
+            <input type="checkbox" className="w-3.5 h-3.5 rounded border-gray-300 text-gray-900 focus:ring-gray-500" />
+            <span className="text-xs text-gray-600">Remember me</span>
           </label>
-          <Link to="/forgot-password" className="text-sm text-primary-600 hover:text-primary-700 font-medium">
+          <Link to="/forgot-password" className="text-xs text-gray-600 hover:text-gray-900 font-medium">
             Forgot password?
           </Link>
         </div>
 
-        <Button type="submit" className="w-full" size="lg" loading={isLoading}>
+        <Button type="submit" className="w-full bg-gray-900 hover:bg-gray-800 text-white" size="lg" loading={isLoading}>
           Sign in
         </Button>
       </form>
 
-      <div className="mt-6 text-center">
-        <p className="text-gray-600">
-          Don't have an account?{' '}
-          <Link to="/register" className="text-primary-600 hover:text-primary-700 font-medium">
-            Sign up
-          </Link>
-        </p>
-      </div>
+      <p className="mt-4 text-center text-xs text-gray-500">
+        Don't have an account?{' '}
+        <Link to="/register" className="text-gray-900 hover:text-gray-700 font-medium">
+          Sign up
+        </Link>
+      </p>
     </div>
   );
 }

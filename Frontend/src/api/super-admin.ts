@@ -63,4 +63,7 @@ export const superAdminApi = {
 
   updateSystemSettings: (data: Record<string, any>) =>
     api.patch('/super-admin/settings', data),
+
+  getPublicPlans: () =>
+    api.get('/public/plans'),
 };

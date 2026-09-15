@@ -35,7 +35,7 @@ import { api } from "../services/api";
 import { Notification } from "../types";
 
 const navigation = [
-  { name: "Dashboard", href: "/", icon: LayoutDashboard },
+  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Clients", href: "/clients", icon: Users },
   { name: "Leads", href: "/leads", icon: Target },
   { name: "Deals", href: "/deals", icon: DollarSign },
@@ -174,7 +174,7 @@ export function MainLayout() {
         {sidebarCollapsed ? (
           <div className="relative shrink-0 flex flex-col items-center py-3 border-b border-gray-100/80">
             <NavLink
-              to="/"
+              to="/dashboard"
               aria-label="ClientHub Home"
               className="w-9 h-9 rounded-xl bg-gray-900 flex items-center justify-center shadow-sm ring-1 ring-gray-900/5"
             >
@@ -191,7 +191,7 @@ export function MainLayout() {
         ) : (
           <div className="relative h-[64px] shrink-0 flex items-center gap-2 px-3 border-b border-gray-100/80">
             <NavLink
-              to="/"
+              to="/dashboard"
               className="flex items-center gap-2.5 min-w-0 flex-1"
               aria-label="ClientHub Home"
             >
@@ -236,7 +236,7 @@ export function MainLayout() {
               {navigation.map((item) => {
                 const isActive =
                   location.pathname === item.href ||
-                  (item.href !== "/" &&
+                  (item.href !== "/dashboard" &&
                     location.pathname.startsWith(item.href));
                 const Icon = item.icon;
                 return (
@@ -372,7 +372,7 @@ export function MainLayout() {
               {bottomNavigation.map((item) => {
                 const isActive =
                   location.pathname === item.href ||
-                  (item.href !== "/" &&
+                  (item.href !== "/dashboard" &&
                     location.pathname.startsWith(item.href));
                 const Icon = item.icon;
                 return (
@@ -483,7 +483,7 @@ export function MainLayout() {
                 {[...navigation, ...adminNavigation, ...bottomNavigation, { name: 'Organizations', href: '/settings/organizations' }].find(
                   (n) =>
                     location.pathname === n.href ||
-                    (n.href !== "/" && location.pathname.startsWith(n.href)),
+                    (n.href !== "/dashboard" && location.pathname.startsWith(n.href)),
                 )?.name || "ClientHub"}
               </h1>
             </div>

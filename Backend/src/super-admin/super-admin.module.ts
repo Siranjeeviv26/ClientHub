@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { SuperAdminService } from './super-admin.service';
 import { SuperAdminController } from './super-admin.controller';
+import { PublicPlansController } from './public-plans.controller';
 import { Organization, OrganizationSchema } from '../organizations/schemas/organization.schema';
 import { User, UserSchema } from '../auth/schemas/user.schema';
 import { Plan, PlanSchema } from '../plans/schemas/plan.schema';
@@ -26,7 +27,7 @@ import { SystemSettings, SystemSettingsSchema } from './schemas/system-settings.
       { name: SystemSettings.name, schema: SystemSettingsSchema },
     ]),
   ],
-  controllers: [SuperAdminController],
+  controllers: [SuperAdminController, PublicPlansController],
   providers: [SuperAdminService],
   exports: [SuperAdminService],
 })
