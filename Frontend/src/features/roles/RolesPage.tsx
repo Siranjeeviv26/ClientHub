@@ -180,35 +180,30 @@ export function RolesPage() {
   }
 
   return (
-    <div className="space-y-10 max-w-[1440px] mx-auto">
-      {/* Hero */}
-      <div className="relative overflow-hidden rounded-2xl bg-white border border-gray-200/70 shadow-sm">
-        <div className="absolute inset-0 bg-[radial-gradient(800px_400px_at_0%_0%,#eef2ff_0%,transparent_50%),radial-gradient(600px_300px_at_100%_0%,#fdf2f8_0%,transparent_50%)] opacity-60" />
-        <div className="absolute inset-0 opacity-[0.015]" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")` }} />
-        <div className="relative p-7 sm:p-8 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-          <div className="min-w-0">
-            <div className="inline-flex items-center gap-2 text-[11px] font-semibold tracking-widest uppercase text-primary-600">
-              <span className="w-6 h-6 rounded-lg bg-primary-600 flex items-center justify-center"><Shield className="w-3.5 h-3.5 text-white" /></span>
-              Administration <span className="w-1 h-1 rounded-full bg-gray-300" /> Access Control
-            </div>
-            <h1 className="text-[28px] sm:text-[30px] font-bold tracking-tight text-gray-900 leading-none mt-3" style={{ letterSpacing: '-0.02em' }}>Roles & Permissions</h1>
-            <p className="text-[14px] text-gray-500 mt-2 max-w-[60ch] leading-relaxed" style={{ textWrap: 'pretty' as any }}>
-              Define who can do what. Four system roles, {allPermissions.length} granular permissions, and a single source of truth on the server.
-            </p>
-            <div className="mt-4 flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gray-900 text-white text-xs font-medium shadow-sm"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> {user?.role} • {user?.email?.split('@')[0]}</span>
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white border border-gray-200 text-xs text-gray-600"><Layers className="w-3 h-3" /> {roles.length} roles</span>
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white border border-gray-200 text-xs text-gray-600"><Key className="w-3 h-3" /> {allPermissions.length} permissions</span>
-            </div>
+    <div className="space-y-8 max-w-[1600px] mx-auto">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+        <div>
+          <div className="inline-flex items-center gap-2 text-xs font-medium tracking-widest uppercase text-primary-600 mb-2">
+            <Shield className="w-3.5 h-3.5" /> Roles & Permissions
           </div>
-          <div className="flex items-center gap-3 shrink-0">
-            <div className="hidden sm:flex items-center gap-2 text-xs text-gray-500">
-              <ShieldCheck className="w-4 h-4 text-emerald-500" /> Server-enforced
-            </div>
-            <Button onClick={handleCreate} disabled={!canManage} leftIcon={<Sparkles className="w-4 h-4" />} className="shadow-sm disabled:opacity-50">
-              New Role
-            </Button>
+          <h1 className="text-[26px] font-bold tracking-tight text-gray-900 leading-tight">Roles & Permissions</h1>
+          <p className="text-[14px] text-gray-500 mt-1.5 leading-relaxed" style={{ textWrap: 'pretty' as any }}>
+            Define who can do what. Four system roles, {allPermissions.length} granular permissions, and a single source of truth on the server.
+          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gray-900 text-white text-xs font-medium shadow-sm"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> {user?.role} • {user?.email?.split('@')[0]}</span>
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white border border-gray-200 text-xs text-gray-600"><Layers className="w-3 h-3" /> {roles.length} roles</span>
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white border border-gray-200 text-xs text-gray-600"><Key className="w-3 h-3" /> {allPermissions.length} permissions</span>
           </div>
+        </div>
+        <div className="flex items-center gap-3 shrink-0">
+          <div className="hidden sm:flex items-center gap-2 text-xs text-gray-500">
+            <ShieldCheck className="w-4 h-4 text-emerald-500" /> Server-enforced
+          </div>
+          <Button onClick={handleCreate} disabled={!canManage} leftIcon={<Sparkles className="w-4 h-4" />} className="shadow-sm disabled:opacity-50">
+            New Role
+          </Button>
         </div>
       </div>
 
@@ -293,7 +288,7 @@ export function RolesPage() {
               </div>
               <div className="hidden sm:flex items-center gap-1.5">
                 {roles.map((r) => {
-                  const m = ROLE_META[r.value];
+                  const m = ROLE_META[r.value] || ROLE_META.EMPLOYEE;
                   const I = m.icon;
                   return <span key={r.value} className={cn('inline-flex items-center gap-1 px-2 py-1.5 rounded-full border text-xs font-medium bg-white', m.bg, m.border, m.color)}><I className="w-3.5 h-3.5" />{r.value}</span>;
                 })}

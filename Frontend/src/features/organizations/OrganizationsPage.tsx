@@ -159,12 +159,14 @@ export function OrganizationsPage() {
           <span className="hidden sm:inline-flex items-center gap-1.5 text-xs text-gray-500">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> {organizations.length} total
           </span>
-          <Button
-            onClick={() => setCreateOpen(true)}
-            leftIcon={<Plus className="w-4 h-4" />}
-          >
-            New Workspace
-          </Button>
+          {isAdmin && (
+            <Button
+              onClick={() => setCreateOpen(true)}
+              leftIcon={<Plus className="w-4 h-4" />}
+            >
+              New Workspace
+            </Button>
+          )}
         </div>
       </div>
 
@@ -186,9 +188,11 @@ export function OrganizationsPage() {
           </div>
           <h3 className="text-sm font-semibold text-gray-900">No workspaces yet</h3>
           <p className="text-sm text-gray-500 mt-1">Create your first workspace to get started.</p>
-          <Button onClick={() => setCreateOpen(true)} leftIcon={<Plus className="w-4 h-4" />} className="mt-4">
-            New Workspace
-          </Button>
+          {isAdmin && (
+            <Button onClick={() => setCreateOpen(true)} leftIcon={<Plus className="w-4 h-4" />} className="mt-4">
+              New Workspace
+            </Button>
+          )}
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">

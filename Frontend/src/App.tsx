@@ -95,6 +95,71 @@ const PaymentsPage = lazy(() =>
     default: m.PaymentsPage,
   })),
 );
+const ReportsPage = lazy(() =>
+  import("./features/reports/ReportsPage").then((m) => ({
+    default: m.default,
+  })),
+);
+const AuditLogsPage = lazy(() =>
+  import("./features/audit-logs/AuditLogsPage").then((m) => ({
+    default: m.AuditLogsPage,
+  })),
+);
+const SubscriptionPage = lazy(() =>
+  import("./features/billing/SubscriptionPage").then((m) => ({
+    default: m.default,
+  })),
+);
+const SuperAdminLayout = lazy(() =>
+  import("./features/super-admin/SuperAdminLayout").then((m) => ({
+    default: m.default,
+  })),
+);
+const SuperAdminDashboard = lazy(() =>
+  import("./features/super-admin/SuperAdminDashboard").then((m) => ({
+    default: m.default,
+  })),
+);
+const SuperAdminOrganizations = lazy(() =>
+  import("./features/super-admin/OrganizationsPage").then((m) => ({
+    default: m.default,
+  })),
+);
+const SuperAdminUsers = lazy(() =>
+  import("./features/super-admin/UsersPage").then((m) => ({
+    default: m.default,
+  })),
+);
+const SuperAdminSubscriptions = lazy(() =>
+  import("./features/super-admin/SubscriptionsPage").then((m) => ({
+    default: m.default,
+  })),
+);
+const SuperAdminPlans = lazy(() =>
+  import("./features/super-admin/PlansPage").then((m) => ({
+    default: m.default,
+  })),
+);
+const SuperAdminAuditLogs = lazy(() =>
+  import("./features/super-admin/AuditLogsPage").then((m) => ({
+    default: m.default,
+  })),
+);
+const SuperAdminPayments = lazy(() =>
+  import("./features/super-admin/PaymentsPage").then((m) => ({
+    default: m.default,
+  })),
+);
+const SuperAdminPlatformAnalytics = lazy(() =>
+  import("./features/super-admin/PlatformAnalyticsPage").then((m) => ({
+    default: m.default,
+  })),
+);
+const SuperAdminSystemSettings = lazy(() =>
+  import("./features/super-admin/SystemSettingsPage").then((m) => ({
+    default: m.default,
+  })),
+);
 
 const LoginPage = lazy(() =>
   import("./features/auth/LoginPage").then((m) => ({ default: m.LoginPage })),
@@ -119,9 +184,14 @@ const VerifyEmailPage = lazy(() =>
     default: m.VerifyEmailPage,
   })),
 );
+const LandingPage = lazy(() =>
+  import("./features/landing/LandingPage").then((m) => ({
+    default: m.default,
+  })),
+);
 
 function ProtectedRoute() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
 
   if (isLoading) {
     return (
@@ -133,6 +203,10 @@ function ProtectedRoute() {
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
+  }
+
+  if (user?.role === 'SUPER_ADMIN' && window.location.pathname !== '/admin' && !window.location.pathname.startsWith('/admin/')) {
+    return <Navigate to="/admin" replace />;
   }
 
   return <Outlet />;
@@ -168,7 +242,7 @@ function PublicRoute() {
   }
 
   if (isAuthenticated) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/dashboard" replace />;
   }
 
   return <Outlet />;
@@ -186,7 +260,7 @@ function RoleRoute({ allowed }: { allowed: string[] }) {
   }
 
   if (!user || !allowed.includes(user.role as string)) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/dashboard" replace />;
   }
 
   return <Outlet />;
@@ -196,6 +270,13 @@ function App() {
   return (
     <ErrorBoundary>
       <Routes>
+        {/* Landing Page - no layout wrapper */}
+        <Route path="/" element={
+          <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><LoadingSpinner size="lg" /></div>}>
+            <LandingPage />
+          </Suspense>
+        } />
+
         {/* Auth Routes */}
         <Route element={<AuthLayout />}>
           <Route element={<PublicRoute />}>
@@ -238,14 +319,16 @@ function App() {
                 </ErrorBoundary>
               }
             />
-            <Route
-              path="/settings/organizations"
-              element={
-                <ErrorBoundary>
-                  <OrganizationsPage />
-                </ErrorBoundary>
-              }
-            />
+            <Route element={<RoleRoute allowed={['ADMIN']} />}>
+              <Route
+                path="/settings/organizations"
+                element={
+                  <ErrorBoundary>
+                    <OrganizationsPage />
+                  </ErrorBoundary>
+                }
+              />
+            </Route>
             <Route
               path="/settings/:section"
               element={
@@ -256,7 +339,7 @@ function App() {
             />
             <Route element={<OrganizationRoute />}>
               <Route
-                path="/"
+                path="/dashboard"
                 element={
                   <ErrorBoundary>
                     <DashboardPage />
@@ -416,13 +499,112 @@ function App() {
                     </ErrorBoundary>
                   }
                 />
-              </Route>
+                <Route
+                  path="/reports"
+                  element={
+                    <ErrorBoundary>
+                      <ReportsPage />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/audit-logs"
+                  element={
+                    <ErrorBoundary>
+                      <AuditLogsPage />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/settings/subscription"
+                  element={
+                    <ErrorBoundary>
+                      <SubscriptionPage />
+                    </ErrorBoundary>
+                  }
+                />
+          </Route>
+        </Route>
+        </Route>
+        </Route>
+
+        {/* Super Admin Routes */}
+        <Route element={<ProtectedRoute />}>
+          <Route element={<RoleRoute allowed={['SUPER_ADMIN']} />}>
+            <Route path="/admin" element={
+              <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><LoadingSpinner size="lg" /></div>}>
+                <SuperAdminLayout />
+              </Suspense>
+            }>
+              <Route index element={
+                <ErrorBoundary>
+                  <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><LoadingSpinner size="lg" /></div>}>
+                    <SuperAdminDashboard />
+                  </Suspense>
+                </ErrorBoundary>
+              } />
+              <Route path="organizations" element={
+                <ErrorBoundary>
+                  <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><LoadingSpinner size="lg" /></div>}>
+                    <SuperAdminOrganizations />
+                  </Suspense>
+                </ErrorBoundary>
+              } />
+              <Route path="users" element={
+                <ErrorBoundary>
+                  <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><LoadingSpinner size="lg" /></div>}>
+                    <SuperAdminUsers />
+                  </Suspense>
+                </ErrorBoundary>
+              } />
+              <Route path="subscriptions" element={
+                <ErrorBoundary>
+                  <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><LoadingSpinner size="lg" /></div>}>
+                    <SuperAdminSubscriptions />
+                  </Suspense>
+                </ErrorBoundary>
+              } />
+              <Route path="plans" element={
+                <ErrorBoundary>
+                  <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><LoadingSpinner size="lg" /></div>}>
+                    <SuperAdminPlans />
+                  </Suspense>
+                </ErrorBoundary>
+              } />
+              <Route path="audit-logs" element={
+                <ErrorBoundary>
+                  <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><LoadingSpinner size="lg" /></div>}>
+                    <SuperAdminAuditLogs />
+                  </Suspense>
+                </ErrorBoundary>
+              } />
+              <Route path="payments" element={
+                <ErrorBoundary>
+                  <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><LoadingSpinner size="lg" /></div>}>
+                    <SuperAdminPayments />
+                  </Suspense>
+                </ErrorBoundary>
+              } />
+              <Route path="analytics" element={
+                <ErrorBoundary>
+                  <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><LoadingSpinner size="lg" /></div>}>
+                    <SuperAdminPlatformAnalytics />
+                  </Suspense>
+                </ErrorBoundary>
+              } />
+              <Route path="settings" element={
+                <ErrorBoundary>
+                  <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><LoadingSpinner size="lg" /></div>}>
+                    <SuperAdminSystemSettings />
+                  </Suspense>
+                </ErrorBoundary>
+              } />
             </Route>
           </Route>
         </Route>
 
         {/* Catch all */}
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </ErrorBoundary>
   );

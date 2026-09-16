@@ -587,6 +587,11 @@ export class SeedService implements OnModuleInit {
         price: 29,
         period: "/mo",
         memberLimit: 10,
+        clientLimit: 100,
+        leadLimit: 500,
+        dealLimit: 100,
+        storageLimit: 5368709120,
+        monthlyEmailLimit: 500,
         features: ["1 workspace", "Up to 10 members", "Clients, leads & deals", "Tasks & activities", "Email support"],
         isActive: true,
         sortOrder: 1,
@@ -598,6 +603,11 @@ export class SeedService implements OnModuleInit {
         price: 79,
         period: "/mo",
         memberLimit: 50,
+        clientLimit: 2000,
+        leadLimit: 5000,
+        dealLimit: 500,
+        storageLimit: 21474836480,
+        monthlyEmailLimit: 5000,
         features: ["5 workspaces", "Up to 50 members", "Everything in Starter", "Custom roles & permissions", "Pipeline analytics", "Priority support"],
         isActive: true,
         sortOrder: 2,
@@ -609,6 +619,11 @@ export class SeedService implements OnModuleInit {
         price: 0,
         period: "",
         memberLimit: undefined,
+        clientLimit: -1,
+        leadLimit: -1,
+        dealLimit: -1,
+        storageLimit: -1,
+        monthlyEmailLimit: -1,
         features: ["Unlimited workspaces", "Unlimited members", "Everything in Professional", "Dedicated onboarding", "SSO & audit logs", "SLA guarantee"],
         isActive: true,
         sortOrder: 3,
@@ -643,6 +658,13 @@ export class SeedService implements OnModuleInit {
           dealUpdated: true,
         },
       },
+      subscription: {
+        plan: "professional",
+        status: "active",
+        currentPeriodStart: new Date(),
+        currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      },
+      maxMembers: 50,
     });
 
     const orgId = organization._id;
@@ -693,6 +715,20 @@ export class SeedService implements OnModuleInit {
       isActive: true,
       emailVerified: true,
     });
+
+    // Super Admin user (platform-level, no org membership)
+    const existingSuperAdmin = await this.userModel.findOne({ email: "superadmin@clienthub.com" });
+    if (!existingSuperAdmin) {
+      await this.userModel.create({
+        email: "superadmin@clienthub.com",
+        passwordHash,
+        firstName: "Super",
+        lastName: "Admin",
+        role: Role.SUPER_ADMIN,
+        isActive: true,
+        emailVerified: true,
+      });
+    }
 
     // 3. Create organization memberships
     await this.memberModel.insertMany([

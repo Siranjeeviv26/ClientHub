@@ -1,4 +1,4 @@
-import { IsString, MinLength, MaxLength, Matches, IsOptional, IsNumber, Min, IsArray, IsBoolean, IsInt } from 'class-validator';
+import { IsString, MinLength, MaxLength, Matches, IsOptional, IsNumber, Min, IsArray, IsBoolean, IsInt, IsObject } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreatePlanDto {
@@ -39,11 +39,52 @@ export class CreatePlanDto {
   @Min(1)
   memberLimit?: number;
 
+  @ApiPropertyOptional({ example: 500, description: 'Maximum clients allowed' })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  clientLimit?: number;
+
+  @ApiPropertyOptional({ example: 1000, description: 'Maximum leads allowed' })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  leadLimit?: number;
+
+  @ApiPropertyOptional({ example: 200, description: 'Maximum deals allowed' })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  dealLimit?: number;
+
+  @ApiPropertyOptional({ example: 5368709120, description: 'Storage limit in bytes (5GB default)' })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  storageLimit?: number;
+
+  @ApiPropertyOptional({ example: 1000, description: 'Monthly email send limit' })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  monthlyEmailLimit?: number;
+
   @ApiPropertyOptional({ example: ['5 workspaces', 'Up to 50 members'] })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
   features?: string[];
+
+  @ApiPropertyOptional({ example: ['ADMIN', 'MANAGER', 'SALES', 'EMPLOYEE'], description: 'Roles that organizations on this plan can assign' })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  allowedRoles?: string[];
+
+  @ApiPropertyOptional({ example: { MANAGER: ['reports:read', 'reports:export'], SALES: ['deals:read'] }, description: 'Additional permissions per role beyond the base set' })
+  @IsOptional()
+  @IsObject()
+  permissions?: Record<string, string[]>;
 
   @ApiPropertyOptional({ example: true })
   @IsOptional()
@@ -96,11 +137,52 @@ export class UpdatePlanDto {
   @Min(1)
   memberLimit?: number;
 
+  @ApiPropertyOptional({ example: 500 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  clientLimit?: number;
+
+  @ApiPropertyOptional({ example: 1000 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  leadLimit?: number;
+
+  @ApiPropertyOptional({ example: 200 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  dealLimit?: number;
+
+  @ApiPropertyOptional({ example: 5368709120 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  storageLimit?: number;
+
+  @ApiPropertyOptional({ example: 1000 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  monthlyEmailLimit?: number;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
   features?: string[];
+
+  @ApiPropertyOptional({ description: 'Roles that organizations on this plan can assign' })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  allowedRoles?: string[];
+
+  @ApiPropertyOptional({ description: 'Additional permissions per role beyond the base set' })
+  @IsOptional()
+  @IsObject()
+  permissions?: Record<string, string[]>;
 
   @ApiPropertyOptional({ example: true })
   @IsOptional()

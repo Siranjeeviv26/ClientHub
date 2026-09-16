@@ -2,7 +2,8 @@ import axios, { AxiosInstance, InternalAxiosRequestConfig, AxiosError } from 'ax
 import toast from 'react-hot-toast';
 import { AuthTokens, ApiError, User, Organization, OrganizationMember, OrganizationInvitation, Client, Lead, Deal, Task, Activity, Notification, DashboardStats, ClientGrowthData, LeadConversionData, PipelineData, RevenueData, UpcomingFollowUp } from '../types';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || '/api/v1';
+// Vite env - Vercel provides VITE_API_URL at build time
+const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || '/api/v1';
 
 class ApiService {
   private client: AxiosInstance;
@@ -120,22 +121,22 @@ class ApiService {
 
   async get<T>(url: string, params?: Record<string, any>) {
     const response = await this.client.get(url, { params });
-    return this.unwrapResponse(response);
+    return this.unwrapResponse<T>(response);
   }
 
   async post<T>(url: string, data?: any, config?: any) {
     const response = await this.client.post(url, data, config);
-    return this.unwrapResponse(response);
+    return this.unwrapResponse<T>(response);
   }
 
   async patch<T>(url: string, data?: any, config?: any) {
     const response = await this.client.patch(url, data, config);
-    return this.unwrapResponse(response);
+    return this.unwrapResponse<T>(response);
   }
 
   async put<T>(url: string, data?: any, config?: any) {
     const response = await this.client.put(url, data, config);
-    return this.unwrapResponse(response);
+    return this.unwrapResponse<T>(response);
   }
 
   async delete<T>(url: string) {
@@ -143,7 +144,7 @@ class ApiService {
     if (response.status === 204 || !response.data) {
       return { success: true, data: null as T };
     }
-    return this.unwrapResponse(response);
+    return this.unwrapResponse<T>(response);
   }
 
   async upload<T>(url: string, file: File, fieldName = 'file', additionalData?: Record<string, any>) {
@@ -158,7 +159,7 @@ class ApiService {
     const response = await this.client.post(url, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
-    return this.unwrapResponse(response);
+    return this.unwrapResponse<T>(response);
   }
 
   setAuth(tokens: AuthTokens) {

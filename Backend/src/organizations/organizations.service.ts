@@ -420,6 +420,14 @@ export class OrganizationsService {
     return organization.settings;
   }
 
+  async updateSettings(organizationId: string, userId: string, settings: Record<string, any>) {
+    await this.checkPermission(organizationId, userId, 'organization:settings:update');
+    const organization = await this.findById(organizationId);
+    organization.settings = { ...organization.settings, ...settings };
+    await organization.save();
+    return organization.settings;
+  }
+
   /**
    * Enforces the vendor-set member limit: ACTIVE members + PENDING
    * invitations must stay below organization.maxMembers (when set).

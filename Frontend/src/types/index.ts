@@ -1,4 +1,4 @@
-export type Role = 'ADMIN' | 'MANAGER' | 'SALES' | 'EMPLOYEE';
+export type Role = 'SUPER_ADMIN' | 'ADMIN' | 'MANAGER' | 'SALES' | 'EMPLOYEE';
 
 // Core Types
 export interface User {
@@ -24,6 +24,7 @@ export interface Organization {
   name: string;
   slug: string;
   logo?: string;
+  maxMembers?: number;
   settings: OrganizationSettings;
   subscription: OrganizationSubscription;
   createdAt: string;
@@ -48,13 +49,33 @@ export interface OrganizationSettings {
     taskDueSoon: boolean;
     dealUpdated: boolean;
   };
+  invoice?: {
+    prefix?: string;
+    nextNumber?: number;
+    defaultTaxRate?: number;
+    paymentTerms?: number;
+  };
+  security?: {
+    passwordMinLength?: number;
+    requireUppercase?: boolean;
+    requireNumbers?: boolean;
+    sessionTimeout?: number;
+  };
 }
+
+export type SubscriptionStatus = 'trialing' | 'active' | 'past_due' | 'cancelled' | 'expired' | 'suspended';
 
 export interface OrganizationSubscription {
   plan?: string;
-  status?: string;
+  status?: SubscriptionStatus;
   trialEndsAt?: string;
   billingEmail?: string;
+  currentPeriodStart?: string;
+  currentPeriodEnd?: string;
+  cancelAtPeriodEnd?: boolean;
+  paymentProvider?: string;
+  paymentSubscriptionId?: string;
+  paymentCustomerId?: string;
 }
 
 export interface OrganizationMember {
@@ -387,4 +408,199 @@ export interface UpdateOrganizationDto {
   dateFormat?: string;
   currency?: string;
   language?: string;
+}
+
+// Phase 3 Types
+
+// Audit Log
+export interface AuditLog {
+  _id: string;
+  organizationId: string;
+  userId: string;
+  action: string;
+  entity: string;
+  entityId?: string;
+  ipAddress?: string;
+  userAgent?: string;
+  metadata?: Record<string, any>;
+  user?: User;
+  createdAt: string;
+}
+
+// Usage
+export interface UsageData {
+  userCount: number;
+  clientCount: number;
+  leadCount: number;
+  dealCount: number;
+  storageUsed: number;
+  emailsSent: number;
+  periodStart: string;
+  periodEnd: string;
+}
+
+export interface PlanLimits {
+  memberLimit?: number;
+  clientLimit: number;
+  leadLimit: number;
+  dealLimit: number;
+  storageLimit: number;
+  monthlyEmailLimit: number;
+}
+
+// Reports
+export interface SalesReport {
+  dealsWon: number;
+  dealsLost: number;
+  conversionRate: number;
+  avgDealValue: number;
+  totalRevenue: number;
+  salespersonPerformance: Array<{
+    userId: string;
+    name: string;
+    dealsWon: number;
+    dealsLost: number;
+    revenue: number;
+    avgValue: number;
+  }>;
+}
+
+export interface RevenueReport {
+  totalRevenue: number;
+  monthlyRevenue: Array<{ month: string; revenue: number; deals: number }>;
+  outstandingInvoices: number;
+  paidInvoices: number;
+  overdueInvoices: number;
+}
+
+export interface ClientReport {
+  totalClients: number;
+  newClients: number;
+  activeClients: number;
+  clientGrowth: Array<{ period: string; count: number }>;
+  retentionRate: number;
+}
+
+export interface LeadReport {
+  totalLeads: number;
+  conversionRate: number;
+  leadsBySource: Array<{ source: string; count: number }>;
+  leadsByStage: Array<{ stage: string; count: number }>;
+  funnelData: Array<{ stage: string; count: number; value: number }>;
+}
+
+export interface EmployeeReport {
+  userId: string;
+  name: string;
+  tasksCompleted: number;
+  dealsWon: number;
+  leadsHandled: number;
+  revenue: number;
+  lastActiveAt?: string;
+}
+
+// Billing
+export interface Plan {
+  _id: string;
+  name: string;
+  slug: string;
+  description?: string;
+  price: number;
+  period: string;
+  memberLimit?: number;
+  clientLimit: number;
+  leadLimit: number;
+  dealLimit: number;
+  storageLimit: number;
+  monthlyEmailLimit: number;
+  features: string[];
+  allowedRoles: string[];
+  permissions: Record<string, string[]>;
+  isActive: boolean;
+  sortOrder: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface PlatformAnalytics {
+  totalOrgs: number;
+  activeOrgs: number;
+  totalUsers: number;
+  activeUsers: number;
+  totalClients: number;
+  totalDeals: number;
+  platformRevenue: number;
+  currentMonthRevenue: number;
+  monthlyGrowth: number;
+  orgGrowth: number;
+  newOrgsThisMonth: number;
+}
+
+export interface SuperAdminOrganization {
+  _id: string;
+  name: string;
+  slug: string;
+  maxMembers?: number;
+  subscription?: { plan?: string; status?: string; currentPeriodEnd?: string };
+  createdAt?: string;
+}
+
+export interface SuperAdminPaginatedResponse<T> {
+  items: T[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    hasNextPage: boolean;
+    hasPrevPage: boolean;
+  };
+}
+
+export interface SuperAdminUser {
+  _id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: string;
+  isActive: boolean;
+  organizationId?: string;
+  createdAt: string;
+}
+
+export interface SubscriptionStatusResponse {
+  organizationId: string;
+  plan?: Plan;
+  status: SubscriptionStatus;
+  trialEndsAt?: string;
+  currentPeriodStart?: string;
+  currentPeriodEnd?: string;
+  cancelAtPeriodEnd?: boolean;
+  usage: UsageData;
+}
+
+export interface SuperAdminPayment {
+  _id: string;
+  paymentNumber: string;
+  amount: number;
+  status: string;
+  method: string;
+  transactionId?: string;
+  reference?: string;
+  notes?: string;
+  paidAt?: string;
+  createdAt: string;
+  organizationId?: { _id: string; name: string; slug: string };
+  invoiceId?: { _id: string; invoiceNumber: string };
+  clientId?: { _id: string; firstName: string; lastName: string; company?: string };
+}
+
+export interface SystemSettingsData {
+  _id: string;
+  platformName: string;
+  supportEmail: string;
+  maintenanceMode: boolean;
+  defaultPlan: string;
+  features: Record<string, boolean>;
+  limits: Record<string, number>;
 }

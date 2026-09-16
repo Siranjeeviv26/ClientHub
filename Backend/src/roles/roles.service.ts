@@ -233,6 +233,7 @@ export class RolesService {
 
   private getRoleLabel(role: Role): string {
     const labels: Record<Role, string> = {
+      [Role.SUPER_ADMIN]: 'Super Admin',
       [Role.ADMIN]: 'Organization Admin',
       [Role.MANAGER]: 'Manager',
       [Role.SALES]: 'Sales',
@@ -243,6 +244,7 @@ export class RolesService {
 
   private getRoleDescription(role: Role): string {
     const descs: Record<Role, string> = {
+      [Role.SUPER_ADMIN]: 'Full platform control',
       [Role.ADMIN]: 'Full organization control',
       [Role.MANAGER]: 'Team and pipeline management',
       [Role.SALES]: 'Sales pipeline and clients',

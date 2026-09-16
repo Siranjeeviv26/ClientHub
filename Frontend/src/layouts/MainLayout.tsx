@@ -27,7 +27,6 @@ import { useAuth } from "../contexts/AuthContext";
 import { useOrganization } from "../contexts/OrganizationContext";
 import { Button } from "../components/ui/Button";
 import { Avatar } from "../components/ui/Avatar";
-import { Badge } from "../components/ui/Badge";
 import { LoadingSpinner } from "../components/ui/LoadingSpinner";
 import { api } from "../services/api";
 import { Notification } from "../types";
@@ -77,13 +76,13 @@ export function MainLayout() {
   const loadNotifications = async () => {
     try {
       const [notifRes, countRes] = await Promise.all([
-        api.getNotifications({ limit: 10 }),
-        api.getUnreadCount(),
+        api.getNotifications({ limit: 10 }) as Promise<any>,
+        api.getUnreadCount() as Promise<any>,
       ]);
       // API returns { success: true, data: { items: Notification[]; pagination: any } }
-      if (notifRes?.data?.items) setNotifications(notifRes.data.items);
-      if (countRes?.data?.count !== undefined)
-        setUnreadCount(countRes.data.count);
+      if ((notifRes as any)?.data?.items) setNotifications((notifRes as any).data.items);
+      if ((countRes as any)?.data?.count !== undefined)
+        setUnreadCount((countRes as any).data.count);
     } catch (error) {
       console.error("Failed to load notifications:", error);
     }

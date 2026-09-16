@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -41,10 +41,7 @@ export function ResetPasswordPage() {
     formState: { errors },
   } = useForm<ResetForm>({
     resolver: zodResolver(resetSchema),
-    defaultValues: {
-      password: '',
-      confirmPassword: '',
-    },
+    defaultValues: { password: '', confirmPassword: '' },
   });
 
   const password = watch('password');
@@ -70,13 +67,12 @@ export function ResetPasswordPage() {
 
   const onSubmit = async (data: ResetForm) => {
     if (!token) return;
-
     setIsLoading(true);
     try {
       const { authApi } = await import('../../api/auth');
       const response = await authApi.resetPassword(token, data.password);
       if (response.success) {
-        toast.success('Password reset successfully! You can now sign in.');
+        toast.success('Password reset! You can now sign in.');
         navigate('/login');
       } else {
         toast.error(response.message || 'Reset failed');
@@ -95,12 +91,12 @@ export function ResetPasswordPage() {
 
   if (!tokenValid) {
     return (
-      <div className="text-center">
-        <AlertCircle className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-        <h2 className="text-xl font-bold text-gray-900 mb-2">Invalid or Expired Link</h2>
-        <p className="text-gray-500 mb-6">This password reset link is invalid or has expired.</p>
-        <Link to="/forgot-password" className="text-primary-600 hover:text-primary-700 font-medium">
-          Request a new reset link
+      <div className="text-center py-4">
+        <AlertCircle className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+        <h2 className="text-lg font-bold text-gray-900 mb-1.5">Link expired</h2>
+        <p className="text-sm text-gray-500 mb-5">This reset link is invalid or has expired.</p>
+        <Link to="/forgot-password" className="text-sm text-gray-900 hover:text-gray-700 font-medium">
+          Request a new link
         </Link>
       </div>
     );
@@ -108,26 +104,21 @@ export function ResetPasswordPage() {
 
   return (
     <div>
-      <div className="text-center mb-8">
-        <h2 className="text-2xl font-bold text-gray-900">Reset your password</h2>
-        <p className="mt-2 text-gray-600">Enter your new password below</p>
+      <div className="text-center mb-6">
+        <h2 className="text-xl font-bold text-gray-900">New password</h2>
+        <p className="mt-1.5 text-sm text-gray-500">Choose something strong and unique</p>
       </div>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" noValidate>
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
         <div>
           <Input
-            label="New Password"
+            label="Password"
             type={showPassword ? 'text' : 'password'}
             placeholder="••••••••"
-            leftIcon={<Lock className="w-5 h-5" />}
+            leftIcon={<Lock className="w-4 h-4" />}
             rightIcon={
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="text-gray-400 hover:text-gray-600"
-                aria-label={showPassword ? 'Hide password' : 'Show password'}
-              >
-                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              <button type="button" onClick={() => setShowPassword(!showPassword)} className="text-gray-400 hover:text-gray-600">
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             }
             error={errors.password?.message}
@@ -136,58 +127,43 @@ export function ResetPasswordPage() {
             disabled={isLoading}
           />
           {password && (
-            <div className="mt-2">
+            <div className="mt-1.5">
               <div className="flex gap-1 mb-1">
                 {Array.from({ length: 5 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="flex-1 h-1.5 rounded transition-colors"
-                    style={{
-                      backgroundColor:
-                        i < strength
-                          ? strength <= 2
-                            ? '#ef4444'
-                            : strength <= 3
-                            ? '#f59e0b'
-                            : '#10b981'
-                          : '#e5e7eb',
-                    }}
-                  />
+                  <div key={i} className="flex-1 h-1 rounded" style={{
+                    backgroundColor: i < strength ? strength <= 2 ? '#ef4444' : strength <= 3 ? '#f59e0b' : '#10b981' : '#e5e7eb',
+                  }} />
                 ))}
               </div>
-              <p className="text-xs text-gray-500">
+              <p className="text-[11px] text-gray-400">
                 {['Very weak', 'Weak', 'Fair', 'Good', 'Strong'][strength - 1] || 'Enter password'}
               </p>
             </div>
           )}
         </div>
 
-        <div>
-          <Input
-            label="Confirm New Password"
-            type={showPassword ? 'text' : 'password'}
-            placeholder="••••••••"
-            leftIcon={<Lock className="w-5 h-5" />}
-            error={errors.confirmPassword?.message}
-            {...register('confirmPassword')}
-            autoComplete="new-password"
-            disabled={isLoading}
-          />
-        </div>
+        <Input
+          label="Confirm Password"
+          type={showPassword ? 'text' : 'password'}
+          placeholder="••••••••"
+          leftIcon={<Lock className="w-4 h-4" />}
+          error={errors.confirmPassword?.message}
+          {...register('confirmPassword')}
+          autoComplete="new-password"
+          disabled={isLoading}
+        />
 
-        <Button type="submit" className="w-full" size="lg" loading={isLoading}>
+        <Button type="submit" className="w-full bg-gray-900 hover:bg-gray-800 text-white" size="lg" loading={isLoading}>
           Reset Password
         </Button>
       </form>
 
-      <div className="mt-6 text-center">
-        <p className="text-gray-600">
-          Remember your password?{' '}
-          <Link to="/login" className="text-primary-600 hover:text-primary-700 font-medium">
-            Sign in
-          </Link>
-        </p>
-      </div>
+      <p className="mt-4 text-center text-xs text-gray-500">
+        Remember your password?{" "}
+        <Link to="/login" className="text-gray-900 hover:text-gray-700 font-medium">
+          Sign in
+        </Link>
+      </p>
     </div>
   );
 }

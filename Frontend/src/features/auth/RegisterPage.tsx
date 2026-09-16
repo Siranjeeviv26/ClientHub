@@ -42,12 +42,7 @@ export function RegisterPage() {
   } = useForm<RegisterForm>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
-      firstName: '',
-      lastName: '',
-      email: '',
-      password: '',
-      confirmPassword: '',
-      organizationName: '',
+      firstName: '', lastName: '', email: '', password: '', confirmPassword: '', organizationName: '',
     },
   });
 
@@ -68,17 +63,14 @@ export function RegisterPage() {
   const onSubmit = async (data: RegisterForm) => {
     setIsLoading(true);
     try {
-      // We need to use the authApi directly since the register method isn't in useAuth
       const { authApi } = await import('../../api/auth');
       const response = await authApi.register({
-        email: data.email,
-        password: data.password,
-        firstName: data.firstName,
-        lastName: data.lastName,
+        email: data.email, password: data.password,
+        firstName: data.firstName, lastName: data.lastName,
         organizationName: data.organizationName,
       });
       if (response.success) {
-        toast.success('Registration successful! Please check your email to verify your account.');
+        toast.success('Account created! Please sign in.');
         navigate('/login');
       } else {
         toast.error(response.message || 'Registration failed');
@@ -92,17 +84,17 @@ export function RegisterPage() {
 
   return (
     <div>
-      <div className="text-center mb-8">
-        <h2 className="text-2xl font-bold text-gray-900">Create your account</h2>
-        <p className="mt-2 text-gray-600">Start managing your clients and deals today</p>
+      <div className="text-center mb-4">
+        <h2 className="text-xl font-bold text-gray-900">Create your account</h2>
+        <p className="mt-1 text-sm text-gray-500">Start managing clients and deals today</p>
       </div>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" noValidate>
-        <div className="grid grid-cols-2 gap-4">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-3" noValidate>
+        <div className="grid grid-cols-2 gap-2.5">
           <Input
             label="First Name"
             placeholder="John"
-            leftIcon={<User className="w-5 h-5" />}
+            leftIcon={<User className="w-4 h-4" />}
             error={errors.firstName?.message}
             {...register('firstName')}
             disabled={isLoading}
@@ -110,7 +102,7 @@ export function RegisterPage() {
           <Input
             label="Last Name"
             placeholder="Doe"
-            leftIcon={<User className="w-5 h-5" />}
+            leftIcon={<User className="w-4 h-4" />}
             error={errors.lastName?.message}
             {...register('lastName')}
             disabled={isLoading}
@@ -121,7 +113,7 @@ export function RegisterPage() {
           label="Email"
           type="email"
           placeholder="you@company.com"
-          leftIcon={<Mail className="w-5 h-5" />}
+          leftIcon={<Mail className="w-4 h-4" />}
           error={errors.email?.message}
           {...register('email')}
           autoComplete="email"
@@ -129,9 +121,9 @@ export function RegisterPage() {
         />
 
         <Input
-          label="Organization Name"
+          label="Organization"
           placeholder="Acme Corporation"
-          leftIcon={<Building2 className="w-5 h-5" />}
+          leftIcon={<Building2 className="w-4 h-4" />}
           error={errors.organizationName?.message}
           {...register('organizationName')}
           disabled={isLoading}
@@ -142,15 +134,10 @@ export function RegisterPage() {
             label="Password"
             type={showPassword ? 'text' : 'password'}
             placeholder="••••••••"
-            leftIcon={<Lock className="w-5 h-5" />}
+            leftIcon={<Lock className="w-4 h-4" />}
             rightIcon={
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="text-gray-400 hover:text-gray-600"
-                aria-label={showPassword ? 'Hide password' : 'Show password'}
-              >
-                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              <button type="button" onClick={() => setShowPassword(!showPassword)} className="text-gray-400 hover:text-gray-600">
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             }
             error={errors.password?.message}
@@ -159,77 +146,53 @@ export function RegisterPage() {
             disabled={isLoading}
           />
           {password && (
-            <div className="mt-2">
-              <div className="flex gap-1 mb-1">
+            <div className="mt-1">
+              <div className="flex gap-0.5 mb-0.5">
                 {Array.from({ length: 5 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="flex-1 h-1.5 rounded transition-colors"
-                    style={{
-                      backgroundColor:
-                        i < strength
-                          ? strength <= 2
-                            ? '#ef4444'
-                            : strength <= 3
-                            ? '#f59e0b'
-                            : '#10b981'
-                          : '#e5e7eb',
-                    }}
-                  />
+                  <div key={i} className="flex-1 h-1 rounded" style={{
+                    backgroundColor: i < strength ? strength <= 2 ? '#ef4444' : strength <= 3 ? '#f59e0b' : '#10b981' : '#e5e7eb',
+                  }} />
                 ))}
               </div>
-              <p className="text-xs text-gray-500">
+              <p className="text-[10px] text-gray-400">
                 {['Very weak', 'Weak', 'Fair', 'Good', 'Strong'][strength - 1] || 'Enter password'}
               </p>
             </div>
           )}
         </div>
 
-        <div>
-          <Input
-            label="Confirm Password"
-            type={showPassword ? 'text' : 'password'}
-            placeholder="••••••••"
-            leftIcon={<Lock className="w-5 h-5" />}
-            error={errors.confirmPassword?.message}
-            {...register('confirmPassword')}
-            autoComplete="new-password"
-            disabled={isLoading}
-          />
-        </div>
+        <Input
+          label="Confirm Password"
+          type={showPassword ? 'text' : 'password'}
+          placeholder="••••••••"
+          leftIcon={<Lock className="w-4 h-4" />}
+          error={errors.confirmPassword?.message}
+          {...register('confirmPassword')}
+          autoComplete="new-password"
+          disabled={isLoading}
+        />
 
-        <div className="flex items-start gap-2">
-          <input
-            type="checkbox"
-            id="terms"
-            required
-            className="mt-1 w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-          />
-          <label htmlFor="terms" className="text-sm text-gray-600">
+        <div className="flex items-start gap-1.5">
+          <input type="checkbox" id="terms" required className="mt-0.5 w-3.5 h-3.5 rounded border-gray-300 text-gray-900 focus:ring-gray-500" />
+          <label htmlFor="terms" className="text-[11px] text-gray-500 leading-snug">
             I agree to the{' '}
-            <Link to="/terms" className="text-primary-600 hover:text-primary-700">
-              Terms of Service
-            </Link>{' '}
-            and{' '}
-            <Link to="/privacy" className="text-primary-600 hover:text-primary-700">
-              Privacy Policy
-            </Link>
+            <Link to="/terms" className="text-gray-900 hover:text-gray-700">Terms</Link>
+            {' '}and{' '}
+            <Link to="/privacy" className="text-gray-900 hover:text-gray-700">Privacy Policy</Link>
           </label>
         </div>
 
-        <Button type="submit" className="w-full" size="lg" loading={isLoading}>
+        <Button type="submit" className="w-full bg-gray-900 hover:bg-gray-800 text-white" size="lg" loading={isLoading}>
           Create Account
         </Button>
       </form>
 
-      <div className="mt-6 text-center">
-        <p className="text-gray-600">
-          Already have an account?{' '}
-          <Link to="/login" className="text-primary-600 hover:text-primary-700 font-medium">
-            Sign in
-          </Link>
-        </p>
-      </div>
+      <p className="mt-3 text-center text-xs text-gray-500">
+        Already have an account?{' '}
+        <Link to="/login" className="text-gray-900 hover:text-gray-700 font-medium">
+          Sign in
+        </Link>
+      </p>
     </div>
   );
 }

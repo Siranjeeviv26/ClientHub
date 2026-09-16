@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
+import helmet from 'helmet';
 
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
@@ -11,6 +12,15 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const configService = app.get(ConfigService);
 
+  // Security headers
+  app.use(helmet({
+    contentSecurityPolicy: false,
+    crossOriginEmbedderPolicy: false,
+  }));
+
+  // Trust proxy for rate limiting behind reverse proxy
+  (app as any).set('trust proxy', 1);
+
   // Global prefix
   app.setGlobalPrefix('api/v1');
 
@@ -19,7 +29,7 @@ async function bootstrap() {
     origin: configService.get<string>('app.clientUrl') || 'http://localhost:5173',
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'X-Organization-Id'],
   });
 
   // Global pipes
@@ -43,8 +53,8 @@ async function bootstrap() {
     const swaggerPath = configService.get<string>('app.swagger.path') || 'api/docs';
     const config = new DocumentBuilder()
       .setTitle('ClientHub API')
-      .setDescription('Multi-tenant B2B SaaS CRM Platform API')
-      .setVersion('1.0')
+      .setDescription('Multi-tenant B2B SaaS CRM Platform API — Phase 3')
+      .setVersion('2.0')
       .addBearerAuth(
         { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
         'access-token',
@@ -59,12 +69,20 @@ async function bootstrap() {
       .addTag('Activities', 'Activity timeline')
       .addTag('Notifications', 'In-app notifications')
       .addTag('Dashboard', 'Analytics & dashboard')
+      .addTag('Reports', 'Advanced reports & analytics')
+      .addTag('Billing', 'Subscription & billing management')
+      .addTag('Usage', 'Plan usage tracking')
+      .addTag('Audit Logs', 'Audit trail & compliance logging')
+      .addTag('Super Admin', 'Platform administration (Super Admin only)')
+      .addTag('Webhooks', 'Payment provider webhook handlers')
       .build();
 
     const document = SwaggerModule.createDocument(app, config);
     SwaggerModule.setup(swaggerPath, app, document, {
       swaggerOptions: {
         persistAuthorization: true,
+        tagsSorter: 'alpha',
+        operationsSorter: 'method',
       },
     });
     console.log(`📚 Swagger available at: http://localhost:${configService.get('app.port')}/${swaggerPath}`);

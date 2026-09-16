@@ -23,8 +23,29 @@ export class Plan {
   @Prop({ type: Number, required: false, min: 1 })
   memberLimit?: number;
 
+  @Prop({ type: Number, default: 100 })
+  clientLimit: number;
+
+  @Prop({ type: Number, default: 500 })
+  leadLimit: number;
+
+  @Prop({ type: Number, default: 100 })
+  dealLimit: number;
+
+  @Prop({ type: Number, default: 1073741824 })
+  storageLimit: number;
+
+  @Prop({ type: Number, default: 1000 })
+  monthlyEmailLimit: number;
+
   @Prop({ type: [String], default: [] })
   features: string[];
+
+  @Prop({ type: [String], default: ['ADMIN', 'EMPLOYEE'] })
+  allowedRoles: string[];
+
+  @Prop({ type: Object, default: {} })
+  permissions: Record<string, string[]>;
 
   @Prop({ default: true, index: true })
   isActive: boolean;

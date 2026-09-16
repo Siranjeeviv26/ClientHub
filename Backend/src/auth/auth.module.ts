@@ -9,6 +9,7 @@ import { AuthController } from './auth.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { User, UserSchema } from './schemas/user.schema';
 import { RefreshToken, RefreshTokenSchema } from './schemas/refresh-token.schema';
+import { OrganizationMember, OrganizationMemberSchema } from '../organizations/schemas/organization-member.schema';
 import { EmailModule } from '../email/email.module';
 
 @Module({
@@ -16,6 +17,7 @@ import { EmailModule } from '../email/email.module';
     MongooseModule.forFeature([
       { name: User.name, schema: UserSchema },
       { name: RefreshToken.name, schema: RefreshTokenSchema },
+      { name: OrganizationMember.name, schema: OrganizationMemberSchema },
     ]),
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
