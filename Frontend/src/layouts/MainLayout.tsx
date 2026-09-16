@@ -21,21 +21,18 @@ import {
   Calendar,
   Receipt,
   CreditCard,
-  BarChart3,
-  ClipboardList,
 } from "lucide-react";
 
 import { useAuth } from "../contexts/AuthContext";
 import { useOrganization } from "../contexts/OrganizationContext";
 import { Button } from "../components/ui/Button";
 import { Avatar } from "../components/ui/Avatar";
-import { Badge } from "../components/ui/Badge";
 import { LoadingSpinner } from "../components/ui/LoadingSpinner";
 import { api } from "../services/api";
 import { Notification } from "../types";
 
 const navigation = [
-  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { name: "Dashboard", href: "/", icon: LayoutDashboard },
   { name: "Clients", href: "/clients", icon: Users },
   { name: "Leads", href: "/leads", icon: Target },
   { name: "Deals", href: "/deals", icon: DollarSign },
@@ -50,15 +47,8 @@ const navigation = [
 ];
 
 const adminNavigation = [
-  { name: "Team", href: "/users", icon: Users, roles: ["ADMIN", "MANAGER"] as const },
-  { name: "Roles & Permissions", href: "/roles", icon: Shield, roles: ["ADMIN"] as const },
-  { name: "Reports", href: "/reports", icon: BarChart3, roles: ["ADMIN", "MANAGER"] as const },
-  { name: "Audit Logs", href: "/audit-logs", icon: ClipboardList, roles: ["ADMIN"] as const },
-  { name: "Subscription", href: "/settings/subscription", icon: CreditCard, roles: ["ADMIN"] as const },
-];
-
-const superAdminNavigation = [
-  { name: "Super Admin Panel", href: "/admin", icon: Shield, roles: ["SUPER_ADMIN"] as const },
+  { name: "Users", href: "/users", icon: Users, roles: ["ADMIN", "MANAGER"] as const },
+  { name: "Roles", href: "/roles", icon: Shield, roles: ["ADMIN", "MANAGER"] as const },
 ];
 
 const bottomNavigation = [
@@ -142,7 +132,7 @@ export function MainLayout() {
   };
 
   return (
-    <div className="h-screen overflow-hidden bg-gray-50 flex">
+    <div className="min-h-screen bg-gray-50">
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
         <div
@@ -173,7 +163,7 @@ export function MainLayout() {
         {sidebarCollapsed ? (
           <div className="relative shrink-0 flex flex-col items-center py-3 border-b border-gray-100/80">
             <NavLink
-              to="/dashboard"
+              to="/"
               aria-label="ClientHub Home"
               className="w-9 h-9 rounded-xl bg-gray-900 flex items-center justify-center shadow-sm ring-1 ring-gray-900/5"
             >
@@ -190,7 +180,7 @@ export function MainLayout() {
         ) : (
           <div className="relative h-[64px] shrink-0 flex items-center gap-2 px-3 border-b border-gray-100/80">
             <NavLink
-              to="/dashboard"
+              to="/"
               className="flex items-center gap-2.5 min-w-0 flex-1"
               aria-label="ClientHub Home"
             >
@@ -235,9 +225,9 @@ export function MainLayout() {
               {navigation.map((item) => {
                 const isActive =
                   location.pathname === item.href ||
-                  (item.href !== "/dashboard" &&
+                  (item.href !== "/" &&
                     location.pathname.startsWith(item.href));
-                const Icon = item.icon || LayoutDashboard;
+                const Icon = item.icon;
                 return (
                   <NavLink
                     key={item.name}
@@ -295,46 +285,7 @@ export function MainLayout() {
                   .filter((item) => (item.roles as readonly string[]).includes(user?.role as string))
                   .map((item) => {
                     const isActive = location.pathname === item.href || (item.href !== '/' && location.pathname.startsWith(item.href));
-                    const Icon = item.icon || Shield;
-                    return (
-                      <NavLink
-                        key={item.name}
-                        to={item.href}
-                        aria-current={isActive ? 'page' : undefined}
-                        title={sidebarCollapsed ? item.name : undefined}
-                        onClick={() => setSidebarOpen(false)}
-                        className={clsx(
-                          'group flex items-center gap-3 rounded-xl text-[13.5px] font-medium transition-all duration-200',
-                          sidebarCollapsed ? 'justify-center p-1 bg-transparent text-gray-600' : 'px-2.5 py-2.5',
-                          !sidebarCollapsed && (isActive ? 'bg-primary-600 text-white shadow-sm shadow-primary-600/20' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'),
-                        )}
-                      >
-                        <span className={clsx('rounded-lg flex items-center justify-center transition-colors shrink-0', sidebarCollapsed ? 'w-9 h-9' : 'w-8 h-8', isActive ? (sidebarCollapsed ? 'bg-primary-600 text-white shadow-sm shadow-primary-600/20' : 'bg-white/15 text-white') : 'bg-white border border-gray-200 text-gray-500 group-hover:bg-gray-50 group-hover:border-gray-300 group-hover:text-gray-700')}>
-                          <Icon className="w-4 h-4" aria-hidden="true" />
-                        </span>
-                        {!sidebarCollapsed && <span className="truncate">{item.name}</span>}
-                        {!sidebarCollapsed && isActive && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-white/70 shrink-0" />}
-                      </NavLink>
-                    );
-                  })}
-              </nav>
-            </div>
-          )}
-
-          {/* Super Admin - visible to SUPER_ADMIN */}
-          {user?.role === 'SUPER_ADMIN' && (
-            <div>
-              {!sidebarCollapsed && (
-                <p className="px-2 mb-2 text-[11px] font-semibold tracking-widest uppercase text-gray-400">
-                  Platform
-                </p>
-              )}
-              <nav className="space-y-1" aria-label="Super Admin">
-                {superAdminNavigation
-                  .filter((item) => (item.roles as readonly string[]).includes(user?.role as string))
-                  .map((item) => {
-                    const isActive = location.pathname === item.href || (item.href !== '/' && location.pathname.startsWith(item.href));
-                    const Icon = item.icon || Shield;
+                    const Icon = item.icon;
                     return (
                       <NavLink
                         key={item.name}
@@ -370,12 +321,10 @@ export function MainLayout() {
             <nav className="space-y-1" aria-label="System">
               {bottomNavigation.map((item) => {
                 const isActive =
-                  item.href === "/settings"
-                    ? location.pathname === "/settings" || (location.pathname.startsWith("/settings/") && !location.pathname.startsWith("/settings/subscription"))
-                    : location.pathname === item.href ||
-                      (item.href !== "/dashboard" &&
-                        location.pathname.startsWith(item.href));
-                const Icon = item.icon || Settings;
+                  location.pathname === item.href ||
+                  (item.href !== "/" &&
+                    location.pathname.startsWith(item.href));
+                const Icon = item.icon;
                 return (
                   <NavLink
                     key={item.name}
@@ -463,7 +412,7 @@ export function MainLayout() {
       {/* Main content */}
       <div
         className={clsx(
-          "flex-1 min-h-0 overflow-y-auto transition-all duration-300 ease-in-out",
+          "transition-all duration-300 ease-in-out",
           sidebarCollapsed ? "lg:ml-[72px]" : "lg:ml-[272px]",
         )}
       >
@@ -484,7 +433,7 @@ export function MainLayout() {
                 {[...navigation, ...adminNavigation, ...bottomNavigation, { name: 'Organizations', href: '/settings/organizations' }].find(
                   (n) =>
                     location.pathname === n.href ||
-                    (n.href !== "/dashboard" && location.pathname.startsWith(n.href)),
+                    (n.href !== "/" && location.pathname.startsWith(n.href)),
                 )?.name || "ClientHub"}
               </h1>
             </div>
@@ -533,16 +482,14 @@ export function MainLayout() {
                       </button>
                     ))}
                     <div className="border-t border-gray-200 my-1" />
-                      {user?.role === 'ADMIN' && (
-                        <NavLink
-                          to="/settings/organizations"
-                          onClick={() => setOrgSwitcherOpen(false)}
-                          className="w-full px-4 py-2 text-sm text-left flex items-center gap-2 text-gray-700 hover:bg-gray-50"
-                        >
-                          <Settings className="w-4 h-4 text-gray-400" />
-                          <span>Manage Organizations</span>
-                        </NavLink>
-                      )}
+                      <NavLink
+                        to="/settings/organizations"
+                        onClick={() => setOrgSwitcherOpen(false)}
+                      className="w-full px-4 py-2 text-sm text-left flex items-center gap-2 text-gray-700 hover:bg-gray-50"
+                    >
+                      <Settings className="w-4 h-4 text-gray-400" />
+                      <span>Manage Organizations</span>
+                    </NavLink>
                   </div>
                 )}
               </div>
