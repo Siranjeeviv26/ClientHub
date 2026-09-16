@@ -36,6 +36,7 @@ import { UsageModule } from './usage/usage.module';
 import { BillingModule } from './billing/billing.module';
 import { ReportsModule } from './reports/reports.module';
 import { SuperAdminModule } from './super-admin/super-admin.module';
+import { HealthModule } from './health/health.module';
 
 @Module({
   imports: [
@@ -89,6 +90,7 @@ import { SuperAdminModule } from './super-admin/super-admin.module';
     BillingModule,
     ReportsModule,
     SuperAdminModule,
+    HealthModule,
   ],
   providers: [
     {
