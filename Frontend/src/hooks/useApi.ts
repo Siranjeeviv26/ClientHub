@@ -185,7 +185,7 @@ export function useDashboardRecentActivities(limit?: number) {
 }
 
 export function useUpcomingFollowUps(limit?: number) {
-  return useApiQuery(['dashboard', 'upcoming-followups', limit], () => api.getUpcomingFollowUps(limit));
+  return useApiQuery(['dashboard', 'upcoming-followups', String(limit ?? 'all')], () => api.getUpcomingFollowUps(limit));
 }
 
 export function useRoles() {
