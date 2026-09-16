@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { Organization, OrganizationMember } from '../types';
 import { organizationsApi } from '../api/organizations';
+import api from '../services/api';
 
 interface OrganizationContextType {
   organization: Organization | null;
@@ -63,6 +64,14 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
 
   const switchOrganization = useCallback(async (organizationId: string) => {
     try {
+      const token = localStorage.getItem('accessToken');
+      if (token) {
+        const res = await api.post<{ accessToken: string; refreshToken: string; expiresIn: number }>('/auth/switch-organization', { organizationId });
+        if (res.success && res.data) {
+          localStorage.setItem('accessToken', res.data.accessToken);
+          localStorage.setItem('refreshToken', res.data.refreshToken);
+        }
+      }
       const response = await organizationsApi.getById(organizationId);
       if (response.success && response.data) {
         setOrganization(response.data);

@@ -20,8 +20,8 @@ export default function UsersPage() {
     try {
       setLoading(true);
       const res = await superAdminApi.getUsers({ page, search }) as { success: boolean; data: SuperAdminPaginatedResponse<SuperAdminUser> };
-      setUsers(res.data.items);
-      setTotalPages(res.data.pagination.totalPages);
+      setUsers(res.data?.items || []);
+      setTotalPages(res.data?.pagination?.totalPages || 1);
     } catch { toast.error('Failed to load users'); }
     finally { setLoading(false); }
   }, [page, search]);

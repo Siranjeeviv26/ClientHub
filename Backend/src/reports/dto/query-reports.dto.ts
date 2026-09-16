@@ -26,4 +26,9 @@ export class ReportQueryDto {
   @IsOptional()
   @IsString()
   source?: string;
+
+  @ApiPropertyOptional({ description: 'Export format', enum: ['csv', 'json'] })
+  @IsOptional()
+  @IsString()
+  format?: string;
 }

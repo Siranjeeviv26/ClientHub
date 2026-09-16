@@ -33,8 +33,8 @@ export default function OrganizationsPage() {
     try {
       setLoading(true);
       const res = await superAdminApi.getOrganizations({ page, search }) as { success: boolean; data: SuperAdminPaginatedResponse<SuperAdminOrganization> };
-      setOrganizations(res.data.items);
-      setTotalPages(res.data.pagination.totalPages);
+      setOrganizations(res.data?.items || []);
+      setTotalPages(res.data?.pagination?.totalPages || 1);
     } catch { toast.error('Failed to load organizations'); }
     finally { setLoading(false); }
   }, [page, search]);

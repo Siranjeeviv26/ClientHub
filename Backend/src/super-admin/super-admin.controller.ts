@@ -110,12 +110,6 @@ export class SuperAdminController {
   }
 
   // Analytics
-  @Get('analytics')
-  @ApiOperation({ summary: 'Get platform-wide analytics' })
-  async getPlatformAnalytics() {
-    return this.superAdminService.getPlatformAnalytics();
-  }
-
   // Plans
   @Get('plans')
   @ApiOperation({ summary: 'Get all subscription plans' })

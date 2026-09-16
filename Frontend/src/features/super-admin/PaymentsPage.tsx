@@ -43,8 +43,8 @@ export default function PaymentsPage() {
     try {
       setLoading(true);
       const res = await superAdminApi.getPayments({ page, search, status: statusFilter === 'all' ? undefined : statusFilter }) as { success: boolean; data: { items: PaymentItem[]; pagination: { totalPages: number } } };
-      setPayments(res.data.items);
-      setTotalPages(res.data.pagination.totalPages);
+      setPayments(res.data?.items || []);
+      setTotalPages(res.data?.pagination?.totalPages || 1);
     } catch { toast.error('Failed to load payments'); }
     finally { setLoading(false); }
   }, [page, search, statusFilter]);
@@ -56,7 +56,7 @@ export default function PaymentsPage() {
       case 'completed': return 'success';
       case 'pending': return 'warning';
       case 'failed': return 'danger';
-      case 'refunded': return 'info';
+      case 'refunded': return 'default';
       default: return 'default';
     }
   };

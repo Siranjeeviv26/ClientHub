@@ -149,6 +149,19 @@ export class AuthController {
   async getProfile(@CurrentUser('_id') userId: string) {
     return this.authService.getProfile(userId);
   }
+
+  @Post('switch-organization')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Switch to a different organization' })
+  @ApiResponse({ status: 200, description: 'New tokens issued' })
+  @ApiResponse({ status: 401, description: 'Not a member of this organization' })
+  async switchOrganization(
+    @CurrentUser('_id') userId: string,
+    @Body('organizationId') organizationId: string,
+  ) {
+    return this.authService.switchOrganization(userId, organizationId);
+  }
 }
 
 // Need to import UnauthorizedException

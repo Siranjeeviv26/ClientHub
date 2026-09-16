@@ -26,6 +26,9 @@ import {
   Settings2,
   ChevronRight,
   Sparkles,
+  FileText,
+  Upload,
+  X,
 } from "lucide-react";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
@@ -135,6 +138,15 @@ const NAV: {
   },
 ];
 
+function ToggleSwitch({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <span className="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out bg-gray-200 peer-checked:bg-gray-900 focus-within:ring-2 focus-within:ring-primary-500 focus-within:ring-offset-2">
+      <input type="checkbox" checked={checked} className="peer sr-only" onChange={(e) => onChange(e.target.checked)} />
+      <span className="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out peer-checked:translate-x-5" />
+    </span>
+  );
+}
+
 export function SettingsPage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -179,6 +191,11 @@ export function SettingsPage() {
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
   const [members, setMembers] = useState<OrganizationMember[]>([]);
   const [orgSettings, setOrgSettings] = useState<any>(null);
+  // Admin-only extended org settings (from OrganizationSettings)
+  const [company, setCompany] = useState({ name: '', logo: '', website: '', phone: '', email: '', address: '' });
+  const [invoice, setInvoice] = useState({ prefix: 'INV', nextNumber: 1001, defaultTaxRate: 0, paymentTerms: 30 });
+  const [security, setSecurity] = useState({ passwordMinLength: 8, requireUppercase: true, requireNumbers: true, sessionTimeout: 60 });
+  const isAdmin = user?.role === 'ADMIN';
 
   const {
     register: registerProfile,
@@ -249,6 +266,27 @@ export function SettingsPage() {
     if (organization) {
       loadMembers();
       loadOrgSettings();
+      // Populate extended admin fields
+      setCompany({
+        name: organization.name || '',
+        logo: (organization as any).logo || '',
+        website: (organization as any).website || '',
+        phone: (organization as any).phone || '',
+        email: (organization as any).email || '',
+        address: (organization as any).address || '',
+      });
+      setInvoice({
+        prefix: organization.settings?.invoice?.prefix || 'INV',
+        nextNumber: organization.settings?.invoice?.nextNumber || 1001,
+        defaultTaxRate: organization.settings?.invoice?.defaultTaxRate || 0,
+        paymentTerms: organization.settings?.invoice?.paymentTerms || 30,
+      });
+      setSecurity({
+        passwordMinLength: organization.settings?.security?.passwordMinLength || 8,
+        requireUppercase: organization.settings?.security?.requireUppercase !== false,
+        requireNumbers: organization.settings?.security?.requireNumbers !== false,
+        sessionTimeout: organization.settings?.security?.sessionTimeout || 60,
+      });
     }
   }, [organization]);
 
@@ -394,6 +432,36 @@ export function SettingsPage() {
       setOrgSettings(orgSettings);
       toast.error(error.response?.data?.message || 'Failed to update notification settings');
     }
+  };
+
+  const handleCompanySave = async () => {
+    if (!organization) return;
+    setSaving(true);
+    try {
+      const res = await organizationsApi.update(organization._id, { name: company.name } as any);
+      if (res.success) { toast.success('Company settings saved'); loadOrganizations(); }
+      // Also save extra fields via settings if needed
+      await organizationsApi.updateSettings(organization._id, { company } as any);
+    } catch (e: any) { toast.error(e.response?.data?.message || 'Failed to save'); }
+    finally { setSaving(false); }
+  };
+  const handleInvoiceSave = async () => {
+    if (!organization) return;
+    setSaving(true);
+    try {
+      const res = await organizationsApi.updateSettings(organization._id, { invoice });
+      if (res.success) toast.success('Invoice settings saved');
+    } catch (e: any) { toast.error(e.response?.data?.message || 'Failed to save'); }
+    finally { setSaving(false); }
+  };
+  const handleSecuritySave = async () => {
+    if (!organization) return;
+    setSaving(true);
+    try {
+      const res = await organizationsApi.updateSettings(organization._id, { security });
+      if (res.success) toast.success('Security settings saved');
+    } catch (e: any) { toast.error(e.response?.data?.message || 'Failed to save'); }
+    finally { setSaving(false); }
   };
 
   const handleAvatarUpload = async (file: File) => {
@@ -828,6 +896,34 @@ export function SettingsPage() {
                   Enable
                 </Button>
               </div>
+
+              {isAdmin && (
+                <div className="bg-white rounded-2xl border border-gray-200/70 shadow-sm p-6 sm:p-7">
+                  <div className="mb-6">
+                    <h3 className="text-[16px] font-semibold text-gray-900 flex items-center gap-2"><Shield className="w-4 h-4 text-gray-400" /> Organization Security Policies</h3>
+                    <p className="text-sm text-gray-500 mt-1">Enforced for all members in this workspace.</p>
+                  </div>
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <Input label="Minimum Password Length" type="number" value={security.passwordMinLength} onChange={(e) => setSecurity({ ...security, passwordMinLength: parseInt(e.target.value) || 8 })} placeholder="8" />
+                      <Input label="Session Timeout (minutes)" type="number" value={security.sessionTimeout} onChange={(e) => setSecurity({ ...security, sessionTimeout: parseInt(e.target.value) || 60 })} placeholder="60" />
+                    </div>
+                    <div className="rounded-xl border border-gray-100 divide-y divide-gray-100">
+                      <label className="flex items-center justify-between gap-4 px-4 py-4 hover:bg-gray-50/60 cursor-pointer transition-colors">
+                        <div className="min-w-0"><p className="text-sm font-medium text-gray-900">Require uppercase letters</p><p className="text-xs text-gray-500 mt-0.5">Passwords must contain one uppercase</p></div>
+                        <ToggleSwitch checked={security.requireUppercase} onChange={(v) => setSecurity({ ...security, requireUppercase: v })} />
+                      </label>
+                      <label className="flex items-center justify-between gap-4 px-4 py-4 hover:bg-gray-50/60 cursor-pointer transition-colors">
+                        <div className="min-w-0"><p className="text-sm font-medium text-gray-900">Require numbers</p><p className="text-xs text-gray-500 mt-0.5">Passwords must contain a number</p></div>
+                        <ToggleSwitch checked={security.requireNumbers} onChange={(v) => setSecurity({ ...security, requireNumbers: v })} />
+                      </label>
+                    </div>
+                    <div className="flex items-center justify-end pt-4 border-t border-gray-100">
+                      <Button onClick={handleSecuritySave} loading={saving} leftIcon={<Save className="w-4 h-4" />}>Save Policies</Button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -886,6 +982,61 @@ export function SettingsPage() {
                   </div>
                 </form>
               </div>
+
+              {/* Admin-only: Company & Invoicing — merged from OrganizationSettings for single admin Settings */}
+              {isAdmin && (
+                <>
+                  <div className="bg-white rounded-2xl border border-gray-200/70 shadow-sm p-6 sm:p-7">
+                    <div className="mb-6">
+                      <h3 className="text-[16px] font-semibold text-gray-900 flex items-center gap-2"><Building2 className="w-4 h-4 text-gray-400" /> Company</h3>
+                      <p className="text-sm text-gray-500 mt-1">Brand and contact details.</p>
+                    </div>
+                    <div className="space-y-6">
+                      <div className="flex items-center gap-5">
+                        <div className="w-20 h-20 rounded-2xl bg-gray-50 border-2 border-dashed border-gray-200 flex items-center justify-center overflow-hidden">
+                          {company.logo ? <img src={company.logo} alt="Logo" className="w-full h-full object-cover" /> : <Upload className="w-6 h-6 text-gray-300" />}
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">Organization Logo</p>
+                          <p className="text-xs text-gray-500 mt-0.5">PNG, JPG up to 2MB. Square recommended.</p>
+                          <div className="flex gap-2 mt-2">
+                            <Button variant="outline" size="sm" leftIcon={<Upload className="w-3.5 h-3.5" />}>Upload</Button>
+                            {company.logo && <Button variant="ghost" size="sm" onClick={() => setCompany({ ...company, logo: '' })} className="text-gray-400 hover:text-red-600"><X className="w-3.5 h-3.5" /></Button>}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <Input label="Company Name" value={company.name} onChange={(e) => setCompany({ ...company, name: e.target.value })} placeholder="Acme Inc." />
+                        <Input label="Website" value={company.website} onChange={(e) => setCompany({ ...company, website: e.target.value })} placeholder="https://acme.com" />
+                        <Input label="Phone" value={company.phone} onChange={(e) => setCompany({ ...company, phone: e.target.value })} placeholder="+1 (555) 019-4821" />
+                        <Input label="Email" type="email" value={company.email} onChange={(e) => setCompany({ ...company, email: e.target.value })} placeholder="hello@acme.com" />
+                      </div>
+                      <Input label="Address" value={company.address} onChange={(e) => setCompany({ ...company, address: e.target.value })} placeholder="123 Main St, City, State, ZIP" />
+                      <div className="flex items-center justify-end pt-4 border-t border-gray-100">
+                        <Button onClick={handleCompanySave} loading={saving} leftIcon={<Save className="w-4 h-4" />}>Save Company</Button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-white rounded-2xl border border-gray-200/70 shadow-sm p-6 sm:p-7">
+                    <div className="mb-6">
+                      <h3 className="text-[16px] font-semibold text-gray-900 flex items-center gap-2"><FileText className="w-4 h-4 text-gray-400" /> Invoicing</h3>
+                      <p className="text-sm text-gray-500 mt-1">Defaults for new invoices.</p>
+                    </div>
+                    <div className="space-y-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <Input label="Invoice Prefix" value={invoice.prefix} onChange={(e) => setInvoice({ ...invoice, prefix: e.target.value })} placeholder="INV" />
+                        <Input label="Next Invoice Number" type="number" value={invoice.nextNumber} onChange={(e) => setInvoice({ ...invoice, nextNumber: parseInt(e.target.value) || 1001 })} placeholder="1001" />
+                        <Input label="Default Tax Rate (%)" type="number" value={invoice.defaultTaxRate} onChange={(e) => setInvoice({ ...invoice, defaultTaxRate: parseFloat(e.target.value) || 0 })} placeholder="0" />
+                        <Input label="Payment Terms (days)" type="number" value={invoice.paymentTerms} onChange={(e) => setInvoice({ ...invoice, paymentTerms: parseInt(e.target.value) || 30 })} placeholder="30" />
+                      </div>
+                      <div className="flex items-center justify-end pt-4 border-t border-gray-100">
+                        <Button onClick={handleInvoiceSave} loading={saving} leftIcon={<Save className="w-4 h-4" />}>Save Invoicing</Button>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           )}
 

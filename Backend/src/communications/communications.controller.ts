@@ -95,6 +95,18 @@ export class CommunicationsController {
     return this.communicationsService.update(organizationId, id, dto);
   }
 
+  @Get(':id')
+  @Permissions('communications:read')
+  @ApiOperation({ summary: 'Get a single communication by ID' })
+  @ApiResponse({ status: 200, description: 'Communication found' })
+  @ApiResponse({ status: 404, description: 'Communication not found' })
+  async findOne(
+    @CurrentOrg() organizationId: string,
+    @Param('id') id: string,
+  ) {
+    return this.communicationsService.findById(organizationId, id);
+  }
+
   @Delete(':id')
   @Permissions('communications:delete')
   @HttpCode(HttpStatus.NO_CONTENT)

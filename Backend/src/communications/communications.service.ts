@@ -48,6 +48,17 @@ export class CommunicationsService {
     return communication;
   }
 
+  async findById(organizationId: string, id: string) {
+    const communication = await this.communicationModel.findOne({
+      _id: new Types.ObjectId(id),
+      organizationId: new Types.ObjectId(organizationId),
+    }).populate('userId', 'name email avatar');
+    if (!communication) {
+      throw new NotFoundException('Communication not found');
+    }
+    return communication;
+  }
+
   async findAll(organizationId: string, query: QueryCommunicationsDto = {}) {
     const page = query.page || 1;
     const limit = query.limit || 20;

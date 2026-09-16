@@ -30,8 +30,8 @@ export default function SuperAdminAuditLogsPage() {
     try {
       setLoading(true);
       const res = await superAdminApi.getAuditLogs({ page, action: actionFilter || undefined, entity: entityFilter || undefined }) as { success: boolean; data: SuperAdminPaginatedResponse<AuditLogEntry> };
-      setLogs(res.data.items);
-      setTotalPages(res.data.pagination.totalPages);
+      setLogs(res.data?.items || []);
+      setTotalPages(res.data?.pagination?.totalPages || 1);
     } catch { toast.error('Failed to load audit logs'); }
     finally { setLoading(false); }
   }, [page, actionFilter, entityFilter]);
@@ -80,8 +80,8 @@ export default function SuperAdminAuditLogsPage() {
                   <tr key={log._id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4"><Badge variant="default">{log.action}</Badge></td>
                     <td className="px-6 py-4"><span className="text-gray-600">{log.entity}</span></td>
-                    <td className="px-6 py-4"><span className="text-gray-500 text-sm">{log.userId ? `${log.userId.firstName} ${log.userId.lastName}` : '—'}</span></td>
-                    <td className="px-6 py-4"><span className="text-gray-500 text-sm">{log.organizationId?.name ?? '—'}</span></td>
+                  <td className="px-6 py-4"><span className="text-gray-500 text-sm">{typeof log.userId === 'string' ? log.userId : log.userId ? `${log.userId.firstName} ${log.userId.lastName}` : '—'}</span></td>
+                  <td className="px-6 py-4"><span className="text-gray-500 text-sm">{typeof log.organizationId === 'string' ? log.organizationId : log.organizationId?.name ?? '—'}</span></td>
                     <td className="px-6 py-4"><span className="text-gray-500 text-sm">{new Date(log.createdAt).toLocaleDateString()}</span></td>
                   </tr>
                 ))}

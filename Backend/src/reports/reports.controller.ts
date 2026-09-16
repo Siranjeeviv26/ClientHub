@@ -1,6 +1,7 @@
 import { Controller, Get, Param, Query, UseGuards, Res } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { Response } from 'express';
+import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { CurrentOrg } from '../common/decorators/current-org.decorator';
@@ -10,7 +11,7 @@ import { ReportQueryDto } from './dto/query-reports.dto';
 @ApiTags('Reports')
 @ApiBearerAuth('access-token')
 @Controller('reports')
-@UseGuards(PermissionsGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class ReportsController {
   constructor(private readonly reportsService: ReportsService) {}
 

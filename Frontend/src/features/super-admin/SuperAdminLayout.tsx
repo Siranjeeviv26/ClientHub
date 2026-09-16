@@ -44,7 +44,7 @@ export default function SuperAdminLayout() {
     <div className="flex h-screen bg-gray-50">
       <aside
         className={clsx(
-          'bg-white border-r border-gray-100/80 flex flex-col shrink-0 transition-all duration-300',
+          'bg-white border-r border-gray-100/80 flex flex-col shrink-0 transition-all duration-300 min-w-0',
           collapsed ? 'w-[72px]' : 'w-[272px]',
         )}
       >
@@ -80,7 +80,7 @@ export default function SuperAdminLayout() {
 
         {/* Nav */}
         <div className={clsx(
-          'relative flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin',
+          'relative flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin min-h-0',
           collapsed ? 'p-2' : 'p-3',
         )}>
           <div>
@@ -154,7 +154,7 @@ export default function SuperAdminLayout() {
         </div>
       </aside>
 
-      <main className="flex-1 overflow-auto">
+      <main className="flex-1 overflow-y-auto min-h-0">
         <div className="p-8">
           <Outlet />
         </div>

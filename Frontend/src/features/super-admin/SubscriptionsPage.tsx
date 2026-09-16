@@ -29,8 +29,8 @@ export default function SubscriptionsPage() {
     try {
       setLoading(true);
       const res = await superAdminApi.getSubscriptions({ page, search, status: statusFilter === 'all' ? undefined : statusFilter }) as { success: boolean; data: SuperAdminPaginatedResponse<SuperAdminOrganization> };
-      setSubscriptions(res.data.items);
-      setTotalPages(res.data.pagination.totalPages);
+      setSubscriptions(res.data?.items || []);
+      setTotalPages(res.data?.pagination?.totalPages || 1);
     } catch { toast.error('Failed to load subscriptions'); }
     finally { setLoading(false); }
   }, [page, search, statusFilter]);

@@ -23,7 +23,13 @@ export default function SystemSettingsPage() {
     (async () => {
       try {
         const res = await superAdminApi.getSystemSettings() as { success: boolean; data: Settings };
-        setSettings(res.data);
+        const data = res.data || {};
+        setSettings(prev => ({
+          ...prev,
+          ...data,
+          features: data.features || {},
+          limits: data.limits || {},
+        }));
       } catch { toast.error('Failed to load settings'); }
       finally { setLoading(false); }
     })();

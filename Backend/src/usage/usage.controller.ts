@@ -1,5 +1,6 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { CurrentOrg } from '../common/decorators/current-org.decorator';
@@ -8,7 +9,7 @@ import { UsageService } from './usage.service';
 @ApiTags('Usage')
 @ApiBearerAuth('access-token')
 @Controller('usage')
-@UseGuards(PermissionsGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class UsageController {
   constructor(private readonly usageService: UsageService) {}
 

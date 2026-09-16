@@ -37,7 +37,12 @@ export function LoginPage() {
     try {
       await login(data.email, data.password);
       toast.success('Welcome back!');
-      navigate('/');
+      // Role-based redirect: SUPER_ADMIN -> /admin, others -> /dashboard
+      // Use stored user (refreshUser has populated it); fallback to /dashboard
+      const raw = localStorage.getItem('user');
+      let role: string | undefined;
+      try { role = raw ? JSON.parse(raw)?.role : undefined; } catch { /* ignore */ }
+      navigate(role === 'SUPER_ADMIN' ? '/admin' : '/dashboard');
     } catch (error: any) {
       toast.error(error.response?.data?.message || error.message || 'Login failed');
     } finally {

@@ -1,5 +1,6 @@
 import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { CurrentOrg } from '../common/decorators/current-org.decorator';
@@ -9,7 +10,7 @@ import { AuditLogsService } from './audit-logs.service';
 @ApiTags('Audit Logs')
 @ApiBearerAuth('access-token')
 @Controller('audit-logs')
-@UseGuards(PermissionsGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class AuditLogsController {
   constructor(private readonly auditLogsService: AuditLogsService) {}
 

@@ -55,7 +55,6 @@ const adminNavigation = [
   { name: "Reports", href: "/reports", icon: BarChart3, roles: ["ADMIN", "MANAGER"] as const },
   { name: "Audit Logs", href: "/audit-logs", icon: ClipboardList, roles: ["ADMIN"] as const },
   { name: "Subscription", href: "/settings/subscription", icon: CreditCard, roles: ["ADMIN"] as const },
-  { name: "Org Settings", href: "/settings/organization", icon: Settings, roles: ["ADMIN"] as const },
 ];
 
 const superAdminNavigation = [
@@ -87,13 +86,13 @@ export function MainLayout() {
   const loadNotifications = async () => {
     try {
       const [notifRes, countRes] = await Promise.all([
-        api.getNotifications({ limit: 10 }),
-        api.getUnreadCount(),
+        api.getNotifications({ limit: 10 }) as Promise<any>,
+        api.getUnreadCount() as Promise<any>,
       ]);
       // API returns { success: true, data: { items: Notification[]; pagination: any } }
-      if (notifRes?.data?.items) setNotifications(notifRes.data.items);
-      if (countRes?.data?.count !== undefined)
-        setUnreadCount(countRes.data.count);
+      if ((notifRes as any)?.data?.items) setNotifications((notifRes as any).data.items);
+      if ((countRes as any)?.data?.count !== undefined)
+        setUnreadCount((countRes as any).data.count);
     } catch (error) {
       console.error("Failed to load notifications:", error);
     }
@@ -143,7 +142,7 @@ export function MainLayout() {
   };
 
   return (
-    <div className="h-screen overflow-hidden bg-gray-50">
+    <div className="h-screen overflow-hidden bg-gray-50 flex">
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
         <div
@@ -238,7 +237,7 @@ export function MainLayout() {
                   location.pathname === item.href ||
                   (item.href !== "/dashboard" &&
                     location.pathname.startsWith(item.href));
-                const Icon = item.icon;
+                const Icon = item.icon || LayoutDashboard;
                 return (
                   <NavLink
                     key={item.name}
@@ -296,7 +295,7 @@ export function MainLayout() {
                   .filter((item) => (item.roles as readonly string[]).includes(user?.role as string))
                   .map((item) => {
                     const isActive = location.pathname === item.href || (item.href !== '/' && location.pathname.startsWith(item.href));
-                    const Icon = item.icon;
+                    const Icon = item.icon || Shield;
                     return (
                       <NavLink
                         key={item.name}
@@ -335,7 +334,7 @@ export function MainLayout() {
                   .filter((item) => (item.roles as readonly string[]).includes(user?.role as string))
                   .map((item) => {
                     const isActive = location.pathname === item.href || (item.href !== '/' && location.pathname.startsWith(item.href));
-                    const Icon = item.icon;
+                    const Icon = item.icon || Shield;
                     return (
                       <NavLink
                         key={item.name}
@@ -371,10 +370,12 @@ export function MainLayout() {
             <nav className="space-y-1" aria-label="System">
               {bottomNavigation.map((item) => {
                 const isActive =
-                  location.pathname === item.href ||
-                  (item.href !== "/dashboard" &&
-                    location.pathname.startsWith(item.href));
-                const Icon = item.icon;
+                  item.href === "/settings"
+                    ? location.pathname === "/settings" || (location.pathname.startsWith("/settings/") && !location.pathname.startsWith("/settings/subscription"))
+                    : location.pathname === item.href ||
+                      (item.href !== "/dashboard" &&
+                        location.pathname.startsWith(item.href));
+                const Icon = item.icon || Settings;
                 return (
                   <NavLink
                     key={item.name}
@@ -462,7 +463,7 @@ export function MainLayout() {
       {/* Main content */}
       <div
         className={clsx(
-          "transition-all duration-300 ease-in-out",
+          "flex-1 min-h-0 overflow-y-auto transition-all duration-300 ease-in-out",
           sidebarCollapsed ? "lg:ml-[72px]" : "lg:ml-[272px]",
         )}
       >
@@ -532,14 +533,16 @@ export function MainLayout() {
                       </button>
                     ))}
                     <div className="border-t border-gray-200 my-1" />
-                      <NavLink
-                        to="/settings/organizations"
-                        onClick={() => setOrgSwitcherOpen(false)}
-                      className="w-full px-4 py-2 text-sm text-left flex items-center gap-2 text-gray-700 hover:bg-gray-50"
-                    >
-                      <Settings className="w-4 h-4 text-gray-400" />
-                      <span>Manage Organizations</span>
-                    </NavLink>
+                      {user?.role === 'ADMIN' && (
+                        <NavLink
+                          to="/settings/organizations"
+                          onClick={() => setOrgSwitcherOpen(false)}
+                          className="w-full px-4 py-2 text-sm text-left flex items-center gap-2 text-gray-700 hover:bg-gray-50"
+                        >
+                          <Settings className="w-4 h-4 text-gray-400" />
+                          <span>Manage Organizations</span>
+                        </NavLink>
+                      )}
                   </div>
                 )}
               </div>

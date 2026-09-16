@@ -1,5 +1,6 @@
 import { Controller, Post, Get, Body, Param, UseGuards, Req } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { CurrentOrg } from '../common/decorators/current-org.decorator';
@@ -9,7 +10,7 @@ import { BillingService } from './billing.service';
 @ApiTags('Billing')
 @ApiBearerAuth('access-token')
 @Controller('billing')
-@UseGuards(PermissionsGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class BillingController {
   constructor(private readonly billingService: BillingService) {}
 

@@ -213,4 +213,16 @@ export class OrganizationsController {
   async getSettings(@Param('id') id: string, @CurrentUser('_id') userId: string) {
     return this.organizationsService.getSettings(id, userId);
   }
+
+  @Patch(':id/settings')
+  @Permissions('organization:settings:update')
+  @ApiOperation({ summary: 'Update organization settings' })
+  @ApiResponse({ status: 200, description: 'Settings updated' })
+  async updateSettings(
+    @Param('id') id: string,
+    @CurrentUser('_id') userId: string,
+    @Body() body: Record<string, any>,
+  ) {
+    return this.organizationsService.updateSettings(id, userId, body);
+  }
 }

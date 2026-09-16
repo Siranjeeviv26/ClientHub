@@ -275,17 +275,46 @@ export default function LandingPage() {
                     <div className="flex items-center justify-between mb-5">
                       <p className="text-sm font-medium text-white/60">Revenue Overview</p>
                       <div className="flex gap-4 text-xs text-white/30">
-                        <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-white/60" /> This Year</span>
+                        <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-white" /> This Year</span>
                         <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-white/20" /> Last Year</span>
                       </div>
                     </div>
-                    <div className="flex items-end gap-2 sm:gap-3 h-32 sm:h-44">
-                      {[35, 55, 40, 70, 50, 80, 65, 75, 55, 85, 70, 90].map((h, i) => (
-                        <div key={i} className="flex-1 flex flex-col gap-1 group/bar">
-                          <div className="rounded-t bg-white/15 group-hover/bar:bg-white/25 transition-colors" style={{ height: `${h * 0.5}%` }} />
-                          <div className="rounded-t bg-white/50 group-hover/bar:bg-white/70 transition-colors" style={{ height: `${h}%` }} />
-                        </div>
-                      ))}
+                    {/* Graph */}
+                    <div className="relative h-32 sm:h-44 w-full">
+                      <style>{`@keyframes draw{to{stroke-dashoffset:0}} @keyframes fadeIn{from{opacity:0} to{opacity:1}} @keyframes popIn{0%{transform:scale(0);opacity:0} 60%{transform:scale(1.4)} 100%{transform:scale(1);opacity:1}} @keyframes riseDrop{0%,100%{transform:translateY(0)} 25%{transform:translateY(-6px)} 50%{transform:translateY(3px)} 75%{transform:translateY(-4px)}}`}</style>
+                      <svg viewBox="0 0 420 160" className="w-full h-full" preserveAspectRatio="none">
+                        <defs>
+                          <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="white" stopOpacity="0.18" />
+                            <stop offset="100%" stopColor="white" stopOpacity="0" />
+                          </linearGradient>
+                        </defs>
+                        {/* Grid */}
+                        <g stroke="rgba(255,255,255,0.06)" strokeWidth="1">
+                          <line x1="0" y1="32" x2="420" y2="32" />
+                          <line x1="0" y1="64" x2="420" y2="64" />
+                          <line x1="0" y1="96" x2="420" y2="96" />
+                          <line x1="0" y1="128" x2="420" y2="128" />
+                        </g>
+                        <g style={{ animation: 'riseDrop 4s ease-in-out infinite 2s' }}>
+                        {/* Last Year area (dashed, lighter) */}
+                        <path d="M0,110 C30,105 60,95 90,85 C120,75 150,90 180,80 C210,70 240,60 270,65 C300,70 330,85 360,80 C385,77 405,75 420,70 L420,140 L0,140 Z" fill="white" fillOpacity="0.06" style={{ animation: 'fadeIn 0.8s ease-out 0.3s both' }} />
+                        <path d="M0,110 C30,105 60,95 90,85 C120,75 150,90 180,80 C210,70 240,60 270,65 C300,70 330,85 360,80 C385,77 405,75 420,70" fill="none" stroke="white" strokeOpacity="0.18" strokeWidth="1.5" strokeDasharray="4 4" strokeLinecap="round" strokeLinejoin="round" style={{ animation: 'fadeIn 1s ease-out 0.6s both' }} />
+                        {/* This Year area */}
+                        <path d="M0,90 C30,70 60,65 90,55 C120,45 150,60 180,40 C210,20 240,30 270,35 C300,40 330,55 360,30 C385,18 405,12 420,15 L420,140 L0,140 Z" fill="url(#revenueGradient)" style={{ animation: 'fadeIn 1s ease-out 0.8s both' }} />
+                        <path d="M0,90 C30,70 60,65 90,55 C120,45 150,60 180,40 C210,20 240,30 270,35 C300,40 330,55 360,30 C385,18 405,12 420,15" fill="none" stroke="white" strokeOpacity="0.9" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ strokeDasharray: 700, strokeDashoffset: 700, animation: 'draw 1.8s ease-out 0.2s forwards' }} />
+                        {/* Dots for This Year */}
+                        {[0, 35, 65, 90, 120, 150, 180, 210, 240, 270, 300, 330, 360, 420].map((_, i) => {
+                          const x = [0, 35, 68, 90, 122, 155, 180, 210, 242, 270, 300, 332, 362, 420][i] || 0;
+                          const y = [90, 70, 65, 55, 45, 60, 40, 20, 30, 35, 40, 55, 30, 15][i] || 0;
+                          return i % 3 === 0 ? <circle key={i} cx={x} cy={y} r="2.5" fill="white" stroke="rgba(255,255,255,0.3)" strokeWidth="2" style={{ animation: `popIn 0.4s ease-out ${1.6 + i * 0.08}s both` }} /> : null;
+                        })}
+                        </g>
+                      </svg>
+                      {/* X axis labels */}
+                      <div className="flex justify-between text-[10px] text-white/25 mt-2 px-1">
+                        <span>Jan</span><span>Mar</span><span>May</span><span>Jul</span><span>Sep</span><span>Nov</span>
+                      </div>
                     </div>
                   </div>
                 </div>

@@ -74,11 +74,11 @@ export default function PlansPage() {
       price: plan.price,
       period: plan.period,
       memberLimit: plan.memberLimit?.toString() || '',
-      clientLimit: plan.clientLimit.toString(),
-      leadLimit: plan.leadLimit.toString(),
-      dealLimit: plan.dealLimit.toString(),
-      storageLimit: plan.storageLimit.toString(),
-      monthlyEmailLimit: plan.monthlyEmailLimit.toString(),
+      clientLimit: plan.clientLimit?.toString() || '',
+      leadLimit: plan.leadLimit?.toString() || '',
+      dealLimit: plan.dealLimit?.toString() || '',
+      storageLimit: plan.storageLimit?.toString() || '',
+      monthlyEmailLimit: plan.monthlyEmailLimit?.toString() || '',
       allowedRoles: plan.allowedRoles || ['ADMIN', 'EMPLOYEE'],
       features: (plan.features || []).join(', '),
       sortOrder: plan.sortOrder,
@@ -146,8 +146,8 @@ export default function PlansPage() {
   };
 
   const filtered = plans.filter(p =>
-    p.name.toLowerCase().includes(search.toLowerCase()) ||
-    p.slug.toLowerCase().includes(search.toLowerCase())
+    p.name?.toLowerCase().includes(search.toLowerCase()) ||
+    p.slug?.toLowerCase().includes(search.toLowerCase())
   );
 
   return (
@@ -193,11 +193,11 @@ export default function PlansPage() {
               <div className="space-y-2 text-sm flex-1">
                 <p className="text-xs text-gray-400 uppercase tracking-wider font-semibold mb-1">Limits</p>
                 <div className="flex justify-between text-gray-500"><span>Members</span><span className="text-gray-900 font-medium">{plan.memberLimit ?? 'Unlimited'}</span></div>
-                <div className="flex justify-between text-gray-500"><span>Clients</span><span className="text-gray-900 font-medium">{plan.clientLimit.toLocaleString()}</span></div>
-                <div className="flex justify-between text-gray-500"><span>Leads</span><span className="text-gray-900 font-medium">{plan.leadLimit.toLocaleString()}</span></div>
-                <div className="flex justify-between text-gray-500"><span>Deals</span><span className="text-gray-900 font-medium">{plan.dealLimit.toLocaleString()}</span></div>
-                <div className="flex justify-between text-gray-500"><span>Storage</span><span className="text-gray-900 font-medium">{formatStorage(plan.storageLimit)}</span></div>
-                <div className="flex justify-between text-gray-500"><span>Emails/mo</span><span className="text-gray-900 font-medium">{plan.monthlyEmailLimit.toLocaleString()}</span></div>
+                <div className="flex justify-between text-gray-500"><span>Clients</span><span className="text-gray-900 font-medium">{plan.clientLimit?.toLocaleString() ?? '—'}</span></div>
+                <div className="flex justify-between text-gray-500"><span>Leads</span><span className="text-gray-900 font-medium">{plan.leadLimit?.toLocaleString() ?? '—'}</span></div>
+                <div className="flex justify-between text-gray-500"><span>Deals</span><span className="text-gray-900 font-medium">{plan.dealLimit?.toLocaleString() ?? '—'}</span></div>
+                <div className="flex justify-between text-gray-500"><span>Storage</span><span className="text-gray-900 font-medium">{plan.storageLimit ? formatStorage(plan.storageLimit) : '—'}</span></div>
+                <div className="flex justify-between text-gray-500"><span>Emails/mo</span><span className="text-gray-900 font-medium">{plan.monthlyEmailLimit?.toLocaleString() ?? '—'}</span></div>
               </div>
 
               <div className="mt-4 pt-4 border-t border-gray-100">
@@ -212,7 +212,7 @@ export default function PlansPage() {
                 </div>
               </div>
 
-              {plan.features.length > 0 && (
+              {(plan.features || []).length > 0 && (
                 <div className="mt-3 pt-3 border-t border-gray-100">
                   <p className="text-xs text-gray-400 uppercase tracking-wider font-semibold mb-2">Features</p>
                   <div className="flex flex-wrap gap-1">

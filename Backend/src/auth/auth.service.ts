@@ -15,6 +15,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 import { User, UserDocument } from './schemas/user.schema';
 import { RefreshToken, RefreshTokenDocument } from './schemas/refresh-token.schema';
+import { OrganizationMember, OrganizationMemberDocument } from '../organizations/schemas/organization-member.schema';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
@@ -45,6 +46,7 @@ export class AuthService {
   constructor(
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     @InjectModel(RefreshToken.name) private refreshTokenModel: Model<RefreshTokenDocument>,
+    @InjectModel(OrganizationMember.name) private orgMemberModel: Model<OrganizationMemberDocument>,
     private jwtService: JwtService,
     private configService: ConfigService,
     private emailService: EmailService,
@@ -315,6 +317,30 @@ export class AuthService {
       return null;
     }
     return user;
+  }
+
+  async switchOrganization(userId: string, organizationId: string, ip?: string, userAgent?: string): Promise<AuthTokens> {
+    const membership = await this.orgMemberModel.findOne({
+      userId: new Types.ObjectId(userId),
+      organizationId: new Types.ObjectId(organizationId),
+      status: 'ACTIVE',
+    });
+    if (!membership) {
+      throw new UnauthorizedException('You are not a member of this organization');
+    }
+
+    const user = await this.userModel.findById(userId);
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    user.organizationId = new Types.ObjectId(organizationId);
+    user.role = membership.role;
+    await user.save();
+
+    const tokens = await this.generateTokens(user, ip, userAgent);
+    this.logger.log(`Organization switched to ${organizationId} for user: ${user.email}`);
+    return tokens;
   }
 
   private async generateTokens(user: UserDocument, ip?: string, userAgent?: string): Promise<AuthTokens> {

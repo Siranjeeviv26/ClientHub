@@ -23,5 +23,5 @@ export const billingApi = {
     api.get('/usage'),
 
   checkLimit: (type: string) =>
-    api.get('/usage/check', { params: { type } }),
+    api.get('/usage/check', { type }),
 };

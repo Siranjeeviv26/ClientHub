@@ -110,11 +110,6 @@ const SubscriptionPage = lazy(() =>
     default: m.default,
   })),
 );
-const OrganizationSettings = lazy(() =>
-  import("./features/settings/OrganizationSettings").then((m) => ({
-    default: m.OrganizationSettings,
-  })),
-);
 const SuperAdminLayout = lazy(() =>
   import("./features/super-admin/SuperAdminLayout").then((m) => ({
     default: m.default,
@@ -324,14 +319,16 @@ function App() {
                 </ErrorBoundary>
               }
             />
-            <Route
-              path="/settings/organizations"
-              element={
-                <ErrorBoundary>
-                  <OrganizationsPage />
-                </ErrorBoundary>
-              }
-            />
+            <Route element={<RoleRoute allowed={['ADMIN']} />}>
+              <Route
+                path="/settings/organizations"
+                element={
+                  <ErrorBoundary>
+                    <OrganizationsPage />
+                  </ErrorBoundary>
+                }
+              />
+            </Route>
             <Route
               path="/settings/:section"
               element={
@@ -526,14 +523,6 @@ function App() {
                     </ErrorBoundary>
                   }
                 />
-                <Route
-                  path="/settings/organization"
-                  element={
-                    <ErrorBoundary>
-                      <OrganizationSettings />
-                    </ErrorBoundary>
-                  }
-                />
           </Route>
         </Route>
         </Route>
@@ -548,49 +537,67 @@ function App() {
               </Suspense>
             }>
               <Route index element={
-                <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><LoadingSpinner size="lg" /></div>}>
-                  <SuperAdminDashboard />
-                </Suspense>
+                <ErrorBoundary>
+                  <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><LoadingSpinner size="lg" /></div>}>
+                    <SuperAdminDashboard />
+                  </Suspense>
+                </ErrorBoundary>
               } />
               <Route path="organizations" element={
-                <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><LoadingSpinner size="lg" /></div>}>
-                  <SuperAdminOrganizations />
-                </Suspense>
+                <ErrorBoundary>
+                  <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><LoadingSpinner size="lg" /></div>}>
+                    <SuperAdminOrganizations />
+                  </Suspense>
+                </ErrorBoundary>
               } />
               <Route path="users" element={
-                <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><LoadingSpinner size="lg" /></div>}>
-                  <SuperAdminUsers />
-                </Suspense>
+                <ErrorBoundary>
+                  <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><LoadingSpinner size="lg" /></div>}>
+                    <SuperAdminUsers />
+                  </Suspense>
+                </ErrorBoundary>
               } />
               <Route path="subscriptions" element={
-                <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><LoadingSpinner size="lg" /></div>}>
-                  <SuperAdminSubscriptions />
-                </Suspense>
+                <ErrorBoundary>
+                  <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><LoadingSpinner size="lg" /></div>}>
+                    <SuperAdminSubscriptions />
+                  </Suspense>
+                </ErrorBoundary>
               } />
               <Route path="plans" element={
-                <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><LoadingSpinner size="lg" /></div>}>
-                  <SuperAdminPlans />
-                </Suspense>
+                <ErrorBoundary>
+                  <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><LoadingSpinner size="lg" /></div>}>
+                    <SuperAdminPlans />
+                  </Suspense>
+                </ErrorBoundary>
               } />
               <Route path="audit-logs" element={
-                <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><LoadingSpinner size="lg" /></div>}>
-                  <SuperAdminAuditLogs />
-                </Suspense>
+                <ErrorBoundary>
+                  <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><LoadingSpinner size="lg" /></div>}>
+                    <SuperAdminAuditLogs />
+                  </Suspense>
+                </ErrorBoundary>
               } />
               <Route path="payments" element={
-                <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><LoadingSpinner size="lg" /></div>}>
-                  <SuperAdminPayments />
-                </Suspense>
+                <ErrorBoundary>
+                  <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><LoadingSpinner size="lg" /></div>}>
+                    <SuperAdminPayments />
+                  </Suspense>
+                </ErrorBoundary>
               } />
               <Route path="analytics" element={
-                <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><LoadingSpinner size="lg" /></div>}>
-                  <SuperAdminPlatformAnalytics />
-                </Suspense>
+                <ErrorBoundary>
+                  <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><LoadingSpinner size="lg" /></div>}>
+                    <SuperAdminPlatformAnalytics />
+                  </Suspense>
+                </ErrorBoundary>
               } />
               <Route path="settings" element={
-                <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><LoadingSpinner size="lg" /></div>}>
-                  <SuperAdminSystemSettings />
-                </Suspense>
+                <ErrorBoundary>
+                  <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><LoadingSpinner size="lg" /></div>}>
+                    <SuperAdminSystemSettings />
+                  </Suspense>
+                </ErrorBoundary>
               } />
             </Route>
           </Route>
