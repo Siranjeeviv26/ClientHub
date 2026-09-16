@@ -2,7 +2,8 @@ import axios, { AxiosInstance, InternalAxiosRequestConfig, AxiosError } from 'ax
 import toast from 'react-hot-toast';
 import { AuthTokens, ApiError, User, Organization, OrganizationMember, OrganizationInvitation, Client, Lead, Deal, Task, Activity, Notification, DashboardStats, ClientGrowthData, LeadConversionData, PipelineData, RevenueData, UpcomingFollowUp } from '../types';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || '/api/v1';
+// Vite env - Vercel provides VITE_API_URL at build time
+const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || '/api/v1';
 
 class ApiService {
   private client: AxiosInstance;
@@ -120,22 +121,22 @@ class ApiService {
 
   async get<T>(url: string, params?: Record<string, any>) {
     const response = await this.client.get(url, { params });
-    return this.unwrapResponse(response);
+    return this.unwrapResponse<T>(response);
   }
 
   async post<T>(url: string, data?: any, config?: any) {
     const response = await this.client.post(url, data, config);
-    return this.unwrapResponse(response);
+    return this.unwrapResponse<T>(response);
   }
 
   async patch<T>(url: string, data?: any, config?: any) {
     const response = await this.client.patch(url, data, config);
-    return this.unwrapResponse(response);
+    return this.unwrapResponse<T>(response);
   }
 
   async put<T>(url: string, data?: any, config?: any) {
     const response = await this.client.put(url, data, config);
-    return this.unwrapResponse(response);
+    return this.unwrapResponse<T>(response);
   }
 
   async delete<T>(url: string) {
@@ -143,7 +144,7 @@ class ApiService {
     if (response.status === 204 || !response.data) {
       return { success: true, data: null as T };
     }
-    return this.unwrapResponse(response);
+    return this.unwrapResponse<T>(response);
   }
 
   async upload<T>(url: string, file: File, fieldName = 'file', additionalData?: Record<string, any>) {
@@ -158,7 +159,7 @@ class ApiService {
     const response = await this.client.post(url, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
-    return this.unwrapResponse(response);
+    return this.unwrapResponse<T>(response);
   }
 
   setAuth(tokens: AuthTokens) {
@@ -287,7 +288,7 @@ class ApiService {
   }
 
   async getUsers(params?: any) {
-    return this.get<{ data: { items: User[]; pagination: any } }>('/users', params);
+    return this.get<{ data: { items: User[]; pagination: any } }>('/users', { params });
   }
 
   async getUser(id: string) {
@@ -303,7 +304,7 @@ class ApiService {
   }
 
   async updateUserStatus(id: string, isActive: boolean) {
-    return this.patch<{ data: User }>(`/users/${id}/status`, { isActive });
+    return this.patch<{ data: User }>(`/users/${id}/status`, isActive);
   }
 
   async removeUser(id: string) {
@@ -319,7 +320,7 @@ class ApiService {
   }
 
   async getClients(params?: any) {
-    return this.get<{ data: { items: Client[]; pagination: any } }>('/clients', params);
+    return this.get<{ data: { items: Client[]; pagination: any } }>('/clients', { params });
   }
 
   async getClient(id: string) {
@@ -347,7 +348,7 @@ class ApiService {
   }
 
   async getClientActivities(id: string, params?: any) {
-    return this.get<{ data: { items: Activity[]; pagination: any } }>(`/clients/${id}/activities`, params);
+    return this.get<{ data: { items: Activity[]; pagination: any } }>(`/clients/${id}/activities`, { params });
   }
 
   async addClientNote(id: string, note: string) {
@@ -355,7 +356,7 @@ class ApiService {
   }
 
   async getLeads(params?: any) {
-    return this.get<{ data: { items: Lead[]; pagination: any } }>('/leads', params);
+    return this.get<{ data: { items: Lead[]; pagination: any } }>('/leads', { params });
   }
 
   async getLeadPipeline() {
@@ -383,11 +384,11 @@ class ApiService {
   }
 
   async getLeadActivities(id: string, params?: any) {
-    return this.get<{ data: { items: Activity[]; pagination: any } }>(`/leads/${id}/activities`, params);
+    return this.get<{ data: { items: Activity[]; pagination: any } }>(`/leads/${id}/activities`, { params });
   }
 
   async getDeals(params?: any) {
-    return this.get<{ data: { items: Deal[]; pagination: any } }>('/deals', params);
+    return this.get<{ data: { items: Deal[]; pagination: any } }>('/deals', { params });
   }
 
   async getDealPipeline() {
@@ -415,11 +416,11 @@ class ApiService {
   }
 
   async getDealActivities(id: string, params?: any) {
-    return this.get<{ data: { items: Activity[]; pagination: any } }>(`/deals/${id}/activities`, params);
+    return this.get<{ data: { items: Activity[]; pagination: any } }>(`/deals/${id}/activities`, { params });
   }
 
   async getTasks(params?: any) {
-    return this.get<{ data: { items: Task[]; pagination: any } }>('/tasks', params);
+    return this.get<{ data: { items: Task[]; pagination: any } }>('/tasks', { params });
   }
 
   async getOverdueTasks() {
@@ -427,7 +428,7 @@ class ApiService {
   }
 
   async getUpcomingTasks(days?: number) {
-    return this.get<{ data: Task[] }>('/tasks/upcoming', { days });
+    return this.get<{ data: Task[] }>('/tasks/upcoming', { params: { days } });
   }
 
   async getTask(id: string) {
@@ -447,15 +448,15 @@ class ApiService {
   }
 
   async getRecentActivities(limit?: number) {
-    return this.get<{ data: Activity[] }>('/activities', { limit });
+    return this.get<{ data: Activity[] }>('/activities', { params: { limit } });
   }
 
   async getMyActivities(params?: any) {
-    return this.get<{ data: { items: Activity[]; pagination: any } }>('/activities/my', params);
+    return this.get<{ data: { items: Activity[]; pagination: any } }>('/activities/my', { params });
   }
 
   async getEntityActivities(relatedType: string, relatedId: string, params?: any) {
-    return this.get<{ data: { items: Activity[]; pagination: any } }>(`/activities/${relatedType}/${relatedId}`, params);
+    return this.get<{ data: { items: Activity[]; pagination: any } }>(`/activities/${relatedType}/${relatedId}`, { params });
   }
 
   async logActivity(data: { type: string; title: string; description?: string; relatedType: string; relatedId: string; metadata?: Record<string, any> }) {
@@ -463,7 +464,7 @@ class ApiService {
   }
 
   async getNotifications(params?: any) {
-    return this.get('/notifications', params);
+    return this.get('/notifications', { params });
   }
 
   async getUnreadCount() {
@@ -483,11 +484,11 @@ class ApiService {
   }
 
   async getClientGrowth(months?: number) {
-    return this.get<{ data: ClientGrowthData[] }>('/dashboard/charts/client-growth', { months });
+    return this.get<{ data: ClientGrowthData[] }>('/dashboard/charts/client-growth', { params: { months } });
   }
 
   async getLeadConversion(months?: number) {
-    return this.get<{ data: LeadConversionData[] }>('/dashboard/charts/lead-conversion', { months });
+    return this.get<{ data: LeadConversionData[] }>('/dashboard/charts/lead-conversion', { params: { months } });
   }
 
   async getSalesPipeline() {
@@ -495,11 +496,11 @@ class ApiService {
   }
 
   async getRevenue(months?: number) {
-    return this.get<{ data: RevenueData[] }>('/dashboard/charts/revenue', { months });
+    return this.get<{ data: RevenueData[] }>('/dashboard/charts/revenue', { params: { months } });
   }
 
   async getUpcomingFollowUps(limit?: number) {
-    return this.get<{ data: UpcomingFollowUp[] }>('/dashboard/upcoming-followups', { limit });
+    return this.get<{ data: UpcomingFollowUp[] }>('/dashboard/upcoming-followups', { params: { limit } });
   }
 
   async getRoles() {
