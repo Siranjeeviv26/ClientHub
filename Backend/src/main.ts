@@ -24,9 +24,26 @@ async function bootstrap() {
   // Global prefix
   app.setGlobalPrefix('api/v1');
 
-  // CORS
+  // CORS — allow Vercel frontend (prod + previews) and localhost
+  const clientUrl = configService.get<string>('app.clientUrl');
+  const allowedOrigins = [
+    clientUrl,
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'https://client-hub-blush.vercel.app',
+  ].filter(Boolean) as string[];
+
   app.enableCors({
-    origin: configService.get<string>('app.clientUrl') || 'http://localhost:5173',
+    origin: (origin, callback) => {
+      // Allow non-browser (no origin) and any allowed origin, including Vercel preview deployments
+      if (!origin) return callback(null, true);
+      const isAllowed =
+        allowedOrigins.includes(origin) ||
+        /^https:\/\/client-hub-.*\.vercel\.app$/.test(origin) ||
+        /^https:\/\/.*\.vercel\.app$/.test(origin);
+      if (isAllowed) return callback(null, true);
+      return callback(null, false);
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'X-Organization-Id'],
