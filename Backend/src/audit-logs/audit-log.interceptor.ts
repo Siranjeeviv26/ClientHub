@@ -27,9 +27,10 @@ export class AuditLogInterceptor implements NestInterceptor {
       PATCH: 'update',
       PUT: 'update',
       DELETE: 'delete',
-      GET: 'read',
     };
 
+    // Only real mutations are stored — GET list/detail fetches are not
+    // logged so the trail holds real-life actions instead of read noise.
     const action = methodMap[method];
     if (!action) return next.handle();
 
@@ -40,16 +41,18 @@ export class AuditLogInterceptor implements NestInterceptor {
     if (!userId) return next.handle();
 
     return next.handle().pipe(
-      tap(async () => {
+      tap(async (response: any) => {
         try {
-          const entityId = this.extractEntityId(url);
+          // Prefer the id from the URL; for creates (POST /clients) the id
+          // only exists in the created document, so fall back to the response
+          const entityId = this.extractEntityId(url) || this.extractResponseId(response);
           await this.auditLogModel.create({
             organizationId: organizationId || undefined,
             userId,
             action,
             entity: entity || 'unknown',
             entityId: entityId || undefined,
-            ipAddress: headers['x-forwarded-for'] || request.ip,
+            ipAddress: this.normalizeIp(headers['x-forwarded-for'] || request.ip),
             userAgent: headers['user-agent'],
             metadata: {
               method,
@@ -74,12 +77,34 @@ export class AuditLogInterceptor implements NestInterceptor {
   }
 
   private extractEntityId(url: string): string | null {
-    const parts = url.split('/').filter(Boolean);
-    const lastPart = parts[parts.length - 1];
-    if (lastPart && /^[0-9a-f]{24}$/i.test(lastPart)) {
-      return lastPart;
+    const pathOnly = url.split('?')[0];
+    const parts = pathOnly.split('/').filter(Boolean);
+    // Scan from the end so nested action routes (e.g. /deals/:id/stage,
+    // /users/:id/role, /notifications/:id/read) still capture the id
+    for (let i = parts.length - 1; i >= 0; i--) {
+      if (/^[0-9a-f]{24}$/i.test(parts[i])) {
+        return parts[i];
+      }
     }
     return null;
+  }
+
+  private extractResponseId(response: any): string | null {
+    if (!response || typeof response !== 'object') return null;
+    const id = response._id || response.data?._id || response.id;
+    if (!id) return null;
+    const str = id.toString();
+    return /^[0-9a-f]{24}$/i.test(str) ? str : null;
+  }
+
+  private normalizeIp(raw: any): string | undefined {
+    if (!raw || typeof raw !== 'string') return undefined;
+    // X-Forwarded-For can be "client, proxy1, proxy2" — take the client
+    let ip = raw.split(',')[0].trim();
+    // Normalize loopback / IPv4-mapped IPv6 to plain IPv4 for readability
+    if (ip === '::1') return '127.0.0.1';
+    if (ip.startsWith('::ffff:')) return ip.slice('::ffff:'.length);
+    return ip || undefined;
   }
 
   private sanitizeBody(body: any): Record<string, any> | undefined {

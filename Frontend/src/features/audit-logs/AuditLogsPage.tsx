@@ -340,23 +340,32 @@ export function AuditLogsPage() {
             key: "userId",
             header: "User",
             width: "180px",
-            render: (log) => (
-              <div className="flex items-center gap-2 min-w-0">
-                <div className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
-                  <User className="w-3.5 h-3.5 text-gray-500" />
-                </div>
-                <div className="min-w-0">
-                  <p className="font-medium text-gray-900 truncate text-sm leading-tight">
-                    {log.user?.fullName || "Unknown User"}
-                  </p>
-                  {log.user?.email && (
-                    <p className="text-xs text-gray-500 truncate">
-                      {log.user.email}
+            render: (log) => {
+              // Backend populates `userId` with { firstName, lastName, email }
+              const u: any = (log as any).userId;
+              const name =
+                u && typeof u === "object"
+                  ? `${u.firstName || ""} ${u.lastName || ""}`.trim() || u.email || null
+                  : null;
+              const email = u && typeof u === "object" ? u.email : null;
+              return (
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
+                    <User className="w-3.5 h-3.5 text-gray-500" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-medium text-gray-900 truncate text-sm leading-tight">
+                      {name || "Unknown User"}
                     </p>
-                  )}
+                    {email && (
+                      <p className="text-xs text-gray-500 truncate">
+                        {email}
+                      </p>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ),
+              );
+            },
           },
           {
             key: "action",
@@ -385,20 +394,6 @@ export function AuditLogsPage() {
                 <span className="text-sm text-gray-700 capitalize">
                   {log.entity}
                 </span>
-              </span>
-            ),
-          },
-          {
-            key: "entityId",
-            header: "Entity ID",
-            width: "140px",
-            className: "hidden lg:table-cell",
-            render: (log) => (
-              <span
-                className="text-sm text-gray-500 font-mono truncate block max-w-[120px]"
-                title={log.entityId}
-              >
-                {log.entityId ? log.entityId.slice(-8) : "—"}
               </span>
             ),
           },

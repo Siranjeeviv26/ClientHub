@@ -928,11 +928,6 @@ export default function ReportsPage() {
           <h1 className="text-[26px] font-bold tracking-tight text-gray-900 leading-tight">Reports</h1>
           <p className="text-[14px] text-gray-500 mt-1.5 leading-relaxed">Analyze performance across sales, revenue, clients, leads, and team. Filter by date and export to CSV.</p>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <span className="hidden sm:inline-flex items-center gap-1.5 text-xs text-gray-500">
-            <BarChart3 className="w-4 h-4 text-primary-500" /> {activeTab} report
-          </span>
-        </div>
       </div>
 
       {/* Controls */}

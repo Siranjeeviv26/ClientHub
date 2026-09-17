@@ -44,6 +44,35 @@ const STATUS_CONFIG: Record<
   suspended: { label: "Suspended", variant: "danger" },
 };
 
+// Clean status pill — solid dot + subtle ring, avoids Badge's conflicting dot classes
+function StatusPill({ status, label }: { status: string; label: string }) {
+  const styles: Record<string, string> = {
+    active: "bg-emerald-50 border-emerald-200 text-emerald-700",
+    trial: "bg-blue-50 border-blue-200 text-blue-700",
+    trialing: "bg-blue-50 border-blue-200 text-blue-700",
+    past_due: "bg-amber-50 border-amber-200 text-amber-700",
+    cancelled: "bg-red-50 border-red-200 text-red-700",
+    expired: "bg-gray-100 border-gray-200 text-gray-600",
+    suspended: "bg-red-50 border-red-200 text-red-700",
+  };
+  const dots: Record<string, string> = {
+    active: "bg-emerald-500",
+    trial: "bg-blue-500",
+    trialing: "bg-blue-500",
+    past_due: "bg-amber-500",
+    cancelled: "bg-red-500",
+    expired: "bg-gray-400",
+    suspended: "bg-red-500",
+  };
+  const key = (status || "").toLowerCase();
+  return (
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-medium whitespace-nowrap ${styles[key] || styles.expired}`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${dots[key] || dots.expired}`} />
+      {label}
+    </span>
+  );
+}
+
 function formatStorage(bytes: number): string {
   if (bytes >= 1073741824) return `${(bytes / 1073741824).toFixed(1)} GB`;
   if (bytes >= 1048576) return `${(bytes / 1048576).toFixed(1)} MB`;
@@ -221,18 +250,6 @@ export default function SubscriptionPage() {
     }
   }
 
-  async function handleStartTrial(planSlug: string) {
-    try {
-      setActionLoading(planSlug);
-      await billingApi.startTrial(planSlug);
-      toast.success("Trial started!");
-      fetchData();
-    } catch (e: any) {
-      toast.error(e.response?.data?.message || "Failed to start trial");
-    } finally {
-      setActionLoading(null);
-    }
-  }
   async function handleSubscribe(planSlug: string) {
     // Check if plan is free — no payment needed
     const targetPlan = plans.find((p) => p.slug === planSlug);
@@ -436,15 +453,11 @@ export default function SubscriptionPage() {
             </p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <span className="inline-flex items-center gap-1.5 text-xs text-gray-500">
-              <CreditCard className="w-4 h-4" /> {plan?.name || "No plan"} ·{" "}
-              <span className="font-medium text-gray-900">
-                {statusConfig.label}
-              </span>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white border border-gray-200 text-xs text-gray-600">
+              <CreditCard className="w-3.5 h-3.5 text-gray-400" />
+              <span className="font-medium text-gray-900">{plan?.name || "No plan"}</span>
             </span>
-            <Badge variant={statusConfig.variant} dot>
-              {statusConfig.label}
-            </Badge>
+            <StatusPill status={status as string} label={statusConfig.label} />
           </div>
         </div>
 
@@ -506,9 +519,7 @@ export default function SubscriptionPage() {
                   <h2 className="text-xl font-bold text-gray-900">
                     {plan?.name || "No Plan"}
                   </h2>
-                  <Badge variant={statusConfig.variant} dot>
-                    {statusConfig.label}
-                  </Badge>
+                  <StatusPill status={status as string} label={statusConfig.label} />
                 </div>
                 {plan && (
                   <div className="space-y-1 text-sm text-gray-500">
@@ -635,12 +646,13 @@ export default function SubscriptionPage() {
           </h2>
           <span className="text-xs text-gray-500 hidden sm:inline">
             {plans.length} plans ·{" "}
-            {plan ? `Current: ${plan.name}` : "Choose one"}
+            {plan && !["cancelled", "expired"].includes(status as string) ? `Current: ${plan.name}` : "Choose one"}
           </span>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {plans.map((p) => {
-            const isCurrent = plan?.slug === p.slug;
+            const isCancelledOrExpired = ["cancelled", "expired"].includes(status as string);
+            const isCurrent = !isCancelledOrExpired && plan?.slug === p.slug;
             const isUpgrade = plan && p.price > plan.price;
             const isDowngrade = plan && p.price < plan.price;
             return (
@@ -715,24 +727,14 @@ export default function SubscriptionPage() {
                         Current Plan
                       </Button>
                     ) : !plan || ["cancelled", "expired"].includes(status) ? (
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          fullWidth
-                          loading={actionLoading === `trial-${p.slug}`}
-                          onClick={() => handleStartTrial(p.slug)}
-                        >
-                          Trial
-                        </Button>
-                        <Button
-                          variant="primary"
-                          fullWidth
-                          loading={actionLoading === p.slug}
-                          onClick={() => handleSubscribe(p.slug)}
-                        >
-                          Subscribe
-                        </Button>
-                      </div>
+                      <Button
+                        variant="primary"
+                        fullWidth
+                        loading={actionLoading === p.slug}
+                        onClick={() => handleSubscribe(p.slug)}
+                      >
+                        Subscribe
+                      </Button>
                     ) : isUpgrade ? (
                       <Button
                         variant="primary"
