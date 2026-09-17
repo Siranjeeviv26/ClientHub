@@ -8,8 +8,12 @@ export class RazorpayProvider implements PaymentProvider {
   private razorpay: any;
 
   constructor(private configService: ConfigService) {
-    const keyId = this.configService.get<string>('RAZORPAY_KEY_ID');
-    const keySecret = this.configService.get<string>('RAZORPAY_KEY_SECRET');
+    const keyId =
+      this.configService.get<string>('RAZORPAY_KEY_ID') ||
+      this.configService.get<string>('app.razorpay.keyId');
+    const keySecret =
+      this.configService.get<string>('RAZORPAY_KEY_SECRET') ||
+      this.configService.get<string>('app.razorpay.keySecret');
     if (keyId && keySecret) {
       try {
         const Razorpay = require('razorpay');
@@ -68,12 +72,36 @@ export class RazorpayProvider implements PaymentProvider {
     if (!this.razorpay) {
       return { url: params.successUrl, sessionId: `order_mock_${Date.now()}` };
     }
+    // For Razorpay, create an order for the plan amount (fetched via planSlug mapping)
+    // Amount will be set by billing service; here we create a generic order
     const order = await this.razorpay.orders.create({
       amount: 0,
       currency: 'INR',
+      receipt: `receipt_${params.planSlug}_${Date.now()}`,
       notes: { planSlug: params.planSlug, customerId: params.customerId },
     });
     return { url: `${params.successUrl}?orderId=${order.id}`, sessionId: order.id };
+  }
+
+  async createOrder(params: { amount: number; currency?: string; receipt: string; notes?: Record<string, string> }): Promise<{ id: string; amount: number; currency: string }> {
+    if (!this.razorpay) {
+      return { id: `order_mock_${Date.now()}`, amount: params.amount, currency: params.currency || 'INR' };
+    }
+    const order = await this.razorpay.orders.create({
+      amount: params.amount, // amount in paise (e.g., 50000 for ₹500)
+      currency: params.currency || 'INR',
+      receipt: params.receipt,
+      notes: params.notes,
+    });
+    return { id: order.id, amount: order.amount, currency: order.currency };
+  }
+
+  async verifyPaymentSignature(params: { orderId: string; paymentId: string; signature: string }): Promise<boolean> {
+    const crypto = require('crypto');
+    const keySecret = this.configService.get<string>('RAZORPAY_KEY_SECRET') || this.configService.get<string>('app.razorpay.keySecret') || '';
+    const body = `${params.orderId}|${params.paymentId}`;
+    const expected = crypto.createHmac('sha256', keySecret).update(body).digest('hex');
+    return expected === params.signature;
   }
 
   async verifyWebhookSignature(params: { payload: Buffer | string; signature: string; secret: string }): Promise<any> {

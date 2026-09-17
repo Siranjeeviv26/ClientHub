@@ -30,6 +30,12 @@ export default registerAs('app', () => ({
     ttl: parseInt(process.env.THROTTLE_TTL || '60', 10),
     limit: parseInt(process.env.THROTTLE_LIMIT || '100', 10),
   },
+  razorpay: {
+    keyId: process.env.RAZORPAY_KEY_ID || 'rzp_test_TcyE5iXeV4CAqG',
+    keySecret: process.env.RAZORPAY_KEY_SECRET || 'D0rGM1Nhv5IRRaDaTkNnGFOP',
+    webhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET || '',
+  },
+  paymentProvider: process.env.PAYMENT_PROVIDER || 'razorpay',
   swagger: {
     enabled: process.env.SWAGGER_ENABLED === 'true',
     path: process.env.SWAGGER_PATH || 'api/docs',

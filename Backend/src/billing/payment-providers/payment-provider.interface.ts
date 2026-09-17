@@ -23,6 +23,19 @@ export interface PaymentProvider {
     cancelUrl: string;
   }): Promise<{ url: string; sessionId: string }>;
 
+  createOrder?(params: {
+    amount: number;
+    currency?: string;
+    receipt: string;
+    notes?: Record<string, string>;
+  }): Promise<{ id: string; amount: number; currency: string }>;
+
+  verifyPaymentSignature?(params: {
+    orderId: string;
+    paymentId: string;
+    signature: string;
+  }): Promise<boolean>;
+
   verifyWebhookSignature(params: {
     payload: Buffer | string;
     signature: string;

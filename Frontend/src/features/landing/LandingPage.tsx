@@ -96,6 +96,7 @@ export default function LandingPage() {
   const [scrollY, setScrollY] = useState(0);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [plans, setPlans] = useState<Plan[]>([]);
+  const [plansLoading, setPlansLoading] = useState(true);
   const heroRef = useRef<HTMLDivElement>(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
 
@@ -107,16 +108,18 @@ export default function LandingPage() {
 
   useEffect(() => {
     (async () => {
+      setPlansLoading(true);
       try {
         const res = await superAdminApi.getPublicPlans() as { success: boolean; data: Plan[] };
         const arr = Array.isArray(res?.data) ? res.data : [];
         if (arr.length) { setPlans(arr); return; }
-      } catch {}
+      } catch (e) { console.warn('public/plans via api wrapper failed', e); }
       // Fallback: direct fetch to cover http://localhost/api/v1, :3000, and proxy
       const bases = [
         (import.meta as any).env?.VITE_API_URL,
         '/api/v1',
         'http://localhost:3000/api/v1',
+        'http://localhost:5000/api/v1',
         'http://localhost/api/v1',
       ].filter(Boolean) as string[];
       for (const b of bases) {
@@ -129,7 +132,9 @@ export default function LandingPage() {
           if (arr.length) { setPlans(arr); return; }
         } catch {}
       }
-    })();
+      // Final fallback: keep empty but stop loading
+      setPlans([]);
+    })().finally(() => setPlansLoading(false));
   }, []);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
@@ -140,7 +145,6 @@ export default function LandingPage() {
   const f1 = useInView(); const f2 = useInView(); const f3 = useInView();
   const f4 = useInView(); const f5 = useInView(); const f6 = useInView();
   const t1 = useInView(); const t2 = useInView(); const t3 = useInView();
-  const p1 = useInView(); const p2 = useInView(); const p3 = useInView();
   const modRef = useInView(0.1); const statRef = useInView(0.2); const ctaRef = useInView(0.2);
   const stepRefs = [useInView(), useInView(), useInView()];
 
@@ -502,14 +506,17 @@ export default function LandingPage() {
             <h2 className="mt-4 text-3xl sm:text-5xl font-bold text-gray-900 tracking-tight">Simple, transparent pricing</h2>
             <p className="mt-5 text-gray-500 text-lg">No hidden fees. Cancel anytime.</p>
           </div>
-          {plans.length > 0 ? (
+          {plansLoading ? (
+            <div className="text-center py-12">
+              <div className="w-8 h-8 border-2 border-gray-300 border-t-gray-900 rounded-full animate-spin mx-auto" />
+              <p className="text-sm text-gray-500 mt-3">Loading plans...</p>
+            </div>
+          ) : plans.length > 0 ? (
             <div className={`grid gap-6 max-w-5xl mx-auto ${plans.length === 1 ? 'max-w-md' : plans.length === 2 ? 'md:grid-cols-2 max-w-2xl' : 'md:grid-cols-3'}`}>
               {plans.map((plan, i) => {
-                const refs = [p1, p2, p3];
-                const r = refs[i] || p1;
                 const isPopular = plans.length >= 3 && i === Math.floor(plans.length / 2);
                 return (
-                  <div key={plan._id} ref={r.ref} className={`relative rounded-2xl border p-8 bg-white transition-all duration-500 hover:-translate-y-2 ${isPopular ? 'border-gray-900 shadow-2xl shadow-gray-900/15 scale-[1.03]' : 'border-gray-200 hover:shadow-xl hover:shadow-gray-200/50 hover:border-gray-300'} ${r.visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`} style={{ transitionDelay: `${i * 100}ms` }}>
+                  <div key={plan._id} className={`relative rounded-2xl border p-8 bg-white transition-all duration-500 hover:-translate-y-2 ${isPopular ? 'border-gray-900 shadow-2xl shadow-gray-900/15 scale-[1.03]' : 'border-gray-200 hover:shadow-xl hover:shadow-gray-200/50 hover:border-gray-300'} opacity-100 translate-y-0`} style={{ transitionDelay: `${i * 100}ms` }}>
                     {isPopular && (
                       <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-[11px] font-semibold px-4 py-1.5 rounded-full uppercase tracking-wider shadow-lg shadow-gray-900/20">Most Popular</div>
                     )}
@@ -545,7 +552,10 @@ export default function LandingPage() {
               })}
             </div>
           ) : (
-            <div className="text-center py-12 text-gray-400">Loading plans...</div>
+            <div className="text-center py-12">
+              <p className="text-sm text-gray-500">No plans available at the moment.</p>
+              <p className="text-xs text-gray-400 mt-1">Please check again later or contact support.</p>
+            </div>
           )}
         </div>
       </section>

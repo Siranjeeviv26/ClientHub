@@ -9,6 +9,8 @@ import {
   Zap,
   Shield,
   BarChart3,
+  History,
+  Receipt,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { billingApi } from "../../api/billing";
@@ -20,6 +22,7 @@ import {
   CardTitle,
   CardContent,
 } from "../../components/ui/Card";
+import { Tabs, TabPanel } from "../../components/ui/Tabs";
 import { Button } from "../../components/ui/Button";
 import { Badge } from "../../components/ui/Badge";
 import { LoadingSpinner } from "../../components/ui/LoadingSpinner";
@@ -53,6 +56,16 @@ function formatCurrency(amount: number): string {
     style: "currency",
     currency: "USD",
   }).format(amount / 100);
+}
+
+// Plan prices are stored in major units (e.g. 29 = $29), unlike payment
+// amounts which are stored in cents/paise. Display plans directly.
+function formatPlanPrice(amount: number): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  }).format(amount || 0);
 }
 
 function getUsageColor(p: number): string {
@@ -133,28 +146,74 @@ export default function SubscriptionPage() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<'overview' | 'history'>('overview');
+  const [history, setHistory] = useState<any[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   useEffect(() => {
     fetchData();
   }, []);
 
+  async function fetchHistory() {
+    try {
+      setHistoryLoading(true);
+      const res: any = await billingApi.getPaymentHistory();
+      const items = res?.data?.items || res?.items || (Array.isArray(res?.data) ? res.data : []);
+      setHistory(Array.isArray(items) ? items : []);
+      // Also merge fresh payment history into status so hero stays in sync
+      if (res?.data) {
+        setStatusData((prev: any) => prev ? ({ ...prev, paymentHistory: items, lastPayment: res.data.lastPayment || prev.lastPayment }) : prev);
+      }
+    } catch (e: any) {
+      console.warn('payment history failed', e?.response?.data || e.message);
+    } finally {
+      setHistoryLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (activeTab === 'history') fetchHistory();
+  }, [activeTab]);
+
   async function fetchData() {
     try {
       setLoading(true);
-      const [statusRes, usageRes, plansRes] = await Promise.all([
-        billingApi.getSubscriptionStatus() as Promise<any>,
-        billingApi.getUsage() as Promise<any>,
-        superAdminApi
-          .getPublicPlans()
-          .catch(() => ({ success: false, data: [] })) as Promise<any>,
+      // Fetch independently so plans (dynamic) show even if status/usage fails
+      const [statusRes, usageRes] = await Promise.all([
+        (billingApi.getSubscriptionStatus() as Promise<any>).catch((e: any) => {
+          console.warn('subscription status failed', e?.response?.data || e.message);
+          return null;
+        }),
+        (billingApi.getUsage() as Promise<any>).catch((e: any) => {
+          console.warn('usage failed', e?.response?.data || e.message);
+          return null;
+        }),
       ]);
-      setStatusData({
-        ...(statusRes.data as object),
-        usage: usageRes.data as any,
-      } as any);
-      if (plansRes?.success && Array.isArray(plansRes.data))
-        setPlans(plansRes.data);
-      else if (Array.isArray(plansRes?.data)) setPlans(plansRes.data);
+      if (statusRes?.data) {
+        setStatusData({
+          ...(statusRes.data as object),
+          usage: (usageRes?.data as any) || (statusRes.data as any).usage || {},
+        } as any);
+      } else {
+        // Still allow plans display with empty status
+        setStatusData({ plan: null, status: 'none', usage: (usageRes?.data as any) || {} } as any);
+      }
+      try {
+        const plansRes = (await superAdminApi.getPublicPlans()) as any;
+        const arr = Array.isArray(plansRes?.data) ? plansRes.data : [];
+        if (arr.length) setPlans(arr);
+        else {
+          // Fallback direct fetch (covers proxy/base mismatches)
+          const r = await fetch('/api/v1/public/plans', { headers: { Accept: 'application/json' } });
+          if (r.ok) {
+            const j = await r.json();
+            const arr2 = Array.isArray(j?.data) ? j.data : [];
+            if (arr2.length) setPlans(arr2);
+          }
+        }
+      } catch (e) {
+        console.warn('public plans failed', e);
+      }
     } catch {
       toast.error("Failed to load subscription data");
     } finally {
@@ -175,26 +234,129 @@ export default function SubscriptionPage() {
     }
   }
   async function handleSubscribe(planSlug: string) {
+    // Check if plan is free — no payment needed
+    const targetPlan = plans.find((p) => p.slug === planSlug);
+    if (targetPlan && (targetPlan.price || 0) === 0) {
+      try {
+        setActionLoading(planSlug);
+        await billingApi.createSubscription(planSlug);
+        toast.success("Subscribed!");
+        fetchData();
+      } catch (e: any) {
+        toast.error(e.response?.data?.message || "Failed to subscribe");
+      } finally {
+        setActionLoading(null);
+      }
+      return;
+    }
+    // Paid plan — use Razorpay
     try {
       setActionLoading(planSlug);
-      await billingApi.createSubscription(planSlug);
-      toast.success("Subscribed!");
-      fetchData();
+      const orderRes: any = await billingApi.createRazorpayOrder(planSlug);
+      const order = orderRes.data || orderRes;
+      if (!order?.orderId || order.amount === 0) {
+        // Free or mock — fallback to direct subscription
+        await billingApi.createSubscription(planSlug);
+        toast.success("Subscribed!");
+        fetchData();
+        return;
+      }
+      const razorpayKey = order.key || (await billingApi.getRazorpayKey() as any)?.data?.key || 'rzp_test_TcyE5iXeV4CAqG';
+      await openRazorpayCheckout({
+        key: razorpayKey,
+        amount: order.amount,
+        currency: order.currency || 'INR',
+        orderId: order.orderId,
+        planSlug,
+        planName: targetPlan?.name || planSlug,
+      });
     } catch (e: any) {
-      toast.error(e.response?.data?.message || "Failed to subscribe");
-    } finally {
+      toast.error(e.response?.data?.message || e.message || "Failed to initiate payment");
       setActionLoading(null);
     }
   }
+
+  function loadRazorpayScript(): Promise<boolean> {
+    return new Promise((resolve) => {
+      if ((window as any).Razorpay) return resolve(true);
+      const s = document.createElement('script');
+      s.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      s.onload = () => resolve(true);
+      s.onerror = () => resolve(false);
+      document.body.appendChild(s);
+    });
+  }
+
+  async function openRazorpayCheckout(opts: { key: string; amount: number; currency: string; orderId: string; planSlug: string; planName: string }) {
+    const ok = await loadRazorpayScript();
+    if (!ok || !(window as any).Razorpay) {
+      toast.error('Failed to load Razorpay checkout');
+      setActionLoading(null);
+      return;
+    }
+    const rzp = new (window as any).Razorpay({
+      key: opts.key,
+      amount: opts.amount,
+      currency: opts.currency,
+      name: 'ClientHub',
+      description: `Subscribe to ${opts.planName}`,
+      order_id: opts.orderId,
+      handler: async (resp: any) => {
+        try {
+          const verifyRes: any = await billingApi.verifyRazorpayPayment({
+            razorpay_order_id: resp.razorpay_order_id,
+            razorpay_payment_id: resp.razorpay_payment_id,
+            razorpay_signature: resp.razorpay_signature,
+            planSlug: opts.planSlug,
+          });
+          // Use server-returned status immediately so UI reflects the new
+          // plan even if the refetch races; then refetch usage/plans.
+          const fresh = (verifyRes as any)?.data || verifyRes;
+          if (fresh && (fresh.plan || fresh.status)) {
+            setStatusData((prev: any) => ({ ...(prev || {}), ...fresh }));
+          }
+          toast.success('Payment verified! Plan upgraded.');
+          await fetchData();
+          await fetchHistory();
+        } catch (e: any) {
+          const msg = e.response?.data?.message || e.message || 'Payment verification failed — plan was NOT changed. Please contact support with your Razorpay payment ID.';
+          toast.error(msg, { duration: 6000 });
+        } finally {
+          setActionLoading(null);
+        }
+      },
+      modal: { ondismiss: () => setActionLoading(null) },
+      theme: { color: '#111827' },
+    });
+    rzp.on('payment.failed', () => {
+      toast.error('Payment failed');
+      setActionLoading(null);
+    });
+    rzp.open();
+  }
   async function handleUpgrade(planSlug: string) {
+    // Use same Razorpay flow as subscribe for paid upgrades
+    const targetPlan = plans.find((p) => p.slug === planSlug);
+    if (targetPlan && (targetPlan.price || 0) === 0) {
+      try { setActionLoading(planSlug); await billingApi.upgradePlan(planSlug); toast.success("Upgraded!"); fetchData(); }
+      catch (e: any) { toast.error(e.response?.data?.message || "Failed to upgrade"); }
+      finally { setActionLoading(null); }
+      return;
+    }
     try {
       setActionLoading(planSlug);
-      await billingApi.upgradePlan(planSlug);
-      toast.success("Upgraded!");
-      fetchData();
+      const orderRes: any = await billingApi.createRazorpayOrder(planSlug);
+      const order = orderRes.data || orderRes;
+      if (!order?.orderId || order.amount === 0) {
+        await billingApi.upgradePlan(planSlug);
+        toast.success("Upgraded!");
+        fetchData();
+        return;
+      }
+      const razorpayKey = order.key || (await billingApi.getRazorpayKey() as any)?.data?.key || 'rzp_test_TcyE5iXeV4CAqG';
+      await openRazorpayCheckout({ key: razorpayKey, amount: order.amount, currency: order.currency || 'INR', orderId: order.orderId, planSlug, planName: targetPlan?.name || planSlug });
     } catch (e: any) {
-      toast.error(e.response?.data?.message || "Failed to upgrade");
-    } finally {
+      toast.error(e.response?.data?.message || e.message || "Failed to upgrade");
       setActionLoading(null);
     }
   }
@@ -318,6 +480,18 @@ export default function SubscriptionPage() {
         </Card>
       )}
 
+      <Tabs
+        tabs={[
+          { id: 'overview', label: 'Overview', icon: <BarChart3 className="w-4 h-4" /> },
+          { id: 'history', label: `History${history.length ? ` (${history.length})` : ''}`, icon: <History className="w-4 h-4" /> },
+        ]}
+        activeTab={activeTab}
+        onChange={(id) => setActiveTab(id as 'overview' | 'history')}
+        variant="pills"
+      />
+
+      <TabPanel id="overview" activeTab={activeTab}>
+      <div className="space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-2">
           <CardHeader>
@@ -339,7 +513,7 @@ export default function SubscriptionPage() {
                 {plan && (
                   <div className="space-y-1 text-sm text-gray-500">
                     <p>
-                      {formatCurrency(plan.price)} / {plan.period}
+                      {formatPlanPrice(plan.price)} / {plan.period}
                     </p>
                     {currentPeriodEnd && (
                       <p>
@@ -496,7 +670,7 @@ export default function SubscriptionPage() {
                 <CardContent className="space-y-4 flex-1 flex flex-col">
                   <div className="text-center py-3 bg-gray-50 rounded-xl border border-gray-100">
                     <span className="text-3xl font-bold tracking-tight text-gray-900">
-                      {formatCurrency(p.price)}
+                      {formatPlanPrice(p.price)}
                     </span>
                     <span className="text-gray-500 text-sm"> / {p.period}</span>
                   </div>
@@ -592,6 +766,64 @@ export default function SubscriptionPage() {
           )}
         </div>
       </div>
+      </div>
+      </TabPanel>
+
+      <TabPanel id="history" activeTab={activeTab}>
+      <div className="space-y-6">
+      <Card className="overflow-hidden">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Receipt className="w-5 h-5 text-gray-400" /> Payment History
+            </CardTitle>
+            <Button variant="outline" size="sm" onClick={fetchHistory} loading={historyLoading}>
+              Refresh
+            </Button>
+          </div>
+          <p className="text-sm text-gray-500 mt-1">Every Razorpay payment stored for this organization — newest first.</p>
+        </CardHeader>
+        <CardContent className="p-0">
+          {historyLoading ? (
+            <div className="flex items-center justify-center py-16"><LoadingSpinner size="lg" /></div>
+          ) : history.length === 0 ? (
+            <div className="text-center py-16 px-6">
+              <History className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+              <p className="text-sm font-medium text-gray-900">No payments recorded yet</p>
+              <p className="text-xs text-gray-500 mt-1 max-w-md mx-auto">Completed Razorpay checkouts are stored here automatically (order ID, payment ID, plan, amount). Buy or upgrade a plan above to create the first entry.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-100 bg-gray-50/60">
+                    <th className="text-left py-3 px-4 text-[11px] font-semibold tracking-widest uppercase text-gray-400">Date</th>
+                    <th className="text-left py-3 px-4 text-[11px] font-semibold tracking-widest uppercase text-gray-400">Plan</th>
+                    <th className="text-right py-3 px-4 text-[11px] font-semibold tracking-widest uppercase text-gray-400">Amount</th>
+                    <th className="text-left py-3 px-4 text-[11px] font-semibold tracking-widest uppercase text-gray-400">Order ID</th>
+                    <th className="text-left py-3 px-4 text-[11px] font-semibold tracking-widest uppercase text-gray-400">Payment ID</th>
+                    <th className="text-left py-3 px-4 text-[11px] font-semibold tracking-widest uppercase text-gray-400">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {history.map((h: any, i: number) => (
+                    <tr key={`${h.paymentId || h.orderId || i}`} className="hover:bg-gray-50/70">
+                      <td className="py-3 px-4 text-gray-700 whitespace-nowrap">{h.paidAt ? new Date(h.paidAt).toLocaleString() : '—'}</td>
+                      <td className="py-3 px-4"><span className="font-medium text-gray-900 capitalize">{h.planSlug || '—'}</span></td>
+                      <td className="py-3 px-4 text-right font-medium text-gray-900">{h.currency || 'INR'} {(Number(h.amount || 0) / 100).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                      <td className="py-3 px-4 font-mono text-xs text-gray-500 max-w-[160px] truncate" title={h.orderId}>{h.orderId || '—'}</td>
+                      <td className="py-3 px-4 font-mono text-xs text-gray-500 max-w-[160px] truncate" title={h.paymentId}>{h.paymentId || '—'}</td>
+                      <td className="py-3 px-4"><Badge variant={h.status === 'captured' ? 'success' : 'gray'} size="sm">{h.status || '—'}</Badge></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+      </div>
+      </TabPanel>
 
       <Modal
         isOpen={cancelModalOpen}

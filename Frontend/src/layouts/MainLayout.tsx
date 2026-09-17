@@ -21,6 +21,8 @@ import {
   Calendar,
   Receipt,
   CreditCard,
+  BarChart3,
+  ClipboardList,
 } from "lucide-react";
 
 import { useAuth } from "../contexts/AuthContext";
@@ -49,6 +51,9 @@ const navigation = [
 const adminNavigation = [
   { name: "Users", href: "/users", icon: Users, roles: ["ADMIN", "MANAGER"] as const },
   { name: "Roles", href: "/roles", icon: Shield, roles: ["ADMIN", "MANAGER"] as const },
+  { name: "Reports", href: "/reports", icon: BarChart3, roles: ["ADMIN", "MANAGER"] as const },
+  { name: "Audit Logs", href: "/audit-logs", icon: ClipboardList, roles: ["ADMIN"] as const },
+  { name: "Subscription", href: "/settings/subscription", icon: CreditCard, roles: ["ADMIN"] as const },
 ];
 
 const bottomNavigation = [

@@ -31,7 +31,11 @@ export class BillingService {
   }
 
   private getProvider(name?: string): PaymentProvider {
-    const providerName = name || this.configService.get<string>('PAYMENT_PROVIDER') || 'stripe';
+    const providerName =
+      name ||
+      this.configService.get<string>('PAYMENT_PROVIDER') ||
+      this.configService.get<string>('app.paymentProvider') ||
+      'stripe';
     const provider = this.providers.get(providerName);
     if (!provider) throw new BadRequestException(`Payment provider '${providerName}' not configured`);
     return provider;
@@ -71,7 +75,113 @@ export class BillingService {
       currentPeriodEnd: sub?.currentPeriodEnd,
       cancelAtPeriodEnd: sub?.cancelAtPeriodEnd || false,
       billingEmail: sub?.billingEmail,
+      paymentProvider: sub?.paymentProvider,
+      paymentOrderId: sub?.paymentOrderId,
+      paymentSubscriptionId: sub?.paymentSubscriptionId,
+      lastPayment: sub?.lastPayment || null,
+      paymentHistory: Array.isArray(sub?.paymentHistory) ? sub.paymentHistory : [],
       usage,
+    };
+  }
+
+  async createRazorpayOrder(organizationId: string, planSlug: string): Promise<any> {
+    const org = await this.organizationModel.findById(organizationId).exec();
+    if (!org) throw new NotFoundException('Organization not found');
+    const plan = await this.plansService.findBySlug(planSlug);
+    if (!plan) throw new NotFoundException('Plan not found');
+    const provider = this.getProvider('razorpay') as any;
+    // Razorpay expects amount in paise (INR). Plan.price is in cents (USD) or dollars? Use plan.price * 100
+    // For test, use INR: amount = plan.price * 100 (e.g., $29 -> 2900 paise -> ₹29)
+    const amount = Math.round((plan.price || 0) * 100);
+    if (amount <= 0) {
+      // Free plan — no order needed, return mock
+      return { orderId: `order_free_${Date.now()}`, amount: 0, currency: 'INR', key: this.configService.get<string>('RAZORPAY_KEY_ID') || this.configService.get<string>('app.razorpay.keyId') };
+    }
+    const order = await provider.createOrder({
+      amount,
+      currency: 'INR',
+      receipt: `receipt_${organizationId}_${Date.now()}`,
+      notes: { organizationId, planSlug },
+    });
+    return {
+      orderId: order.id,
+      amount: order.amount,
+      currency: order.currency,
+      key: this.configService.get<string>('RAZORPAY_KEY_ID') || this.configService.get<string>('app.razorpay.keyId') || 'rzp_test_TcyE5iXeV4CAqG',
+      plan: { name: plan.name, price: plan.price },
+    };
+  }
+
+  async verifyRazorpayPayment(organizationId: string, userId: string, body: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string; planSlug: string }): Promise<any> {
+    const provider = this.getProvider('razorpay') as any;
+    const isValid = await provider.verifyPaymentSignature({
+      orderId: body.razorpay_order_id,
+      paymentId: body.razorpay_payment_id,
+      signature: body.razorpay_signature,
+    });
+    if (!isValid) throw new BadRequestException('Invalid payment signature');
+    // Payment verified — activate subscription (preserve existing fields)
+    const plan = await this.plansService.findBySlug(body.planSlug);
+    if (!plan) throw new NotFoundException('Plan not found');
+    const org = await this.organizationModel.findById(organizationId).exec();
+    if (!org) throw new NotFoundException('Organization not found');
+    const prevSub = (org.subscription as any) || {};
+    const periodEnd = new Date();
+    periodEnd.setMonth(periodEnd.getMonth() + 1);
+    // Store Razorpay payment record inside subscription (Payment collection
+    // requires invoiceId/clientId, so subscription payments live here)
+    const paymentRecord = {
+      provider: 'razorpay',
+      orderId: body.razorpay_order_id,
+      paymentId: body.razorpay_payment_id,
+      signature: body.razorpay_signature,
+      planSlug: body.planSlug,
+      amount: Math.round((plan.price || 0) * 100),
+      currency: 'INR',
+      status: 'captured',
+      paidAt: new Date(),
+      byUserId: userId,
+    };
+    const paymentHistory = Array.isArray(prevSub.paymentHistory) ? prevSub.paymentHistory : [];
+    paymentHistory.push(paymentRecord);
+    org.subscription = {
+      ...prevSub,
+      plan: body.planSlug,
+      status: 'active',
+      currentPeriodStart: new Date(),
+      currentPeriodEnd: periodEnd,
+      cancelAtPeriodEnd: false,
+      paymentProvider: 'razorpay',
+      paymentSubscriptionId: body.razorpay_payment_id,
+      paymentOrderId: body.razorpay_order_id,
+      lastPayment: paymentRecord,
+      paymentHistory,
+    } as any;
+    if (plan.memberLimit) org.maxMembers = plan.memberLimit;
+    await org.save();
+    this.logger.log(`Razorpay payment verified: org=${organizationId} plan=${body.planSlug} payment=${body.razorpay_payment_id}`);
+    await this.auditLogsService.log({
+      organizationId,
+      userId,
+      action: 'subscription_changed',
+      entity: 'subscription',
+      metadata: { planSlug: body.planSlug, status: 'active', action: 'razorpay_verify', paymentId: body.razorpay_payment_id, orderId: body.razorpay_order_id },
+    });
+    return this.getSubscriptionStatus(organizationId);
+  }
+
+  async getPaymentHistory(organizationId: string): Promise<any> {
+    const org = await this.organizationModel.findById(organizationId).lean().exec();
+    if (!org) throw new NotFoundException('Organization not found');
+    const sub = (org as any).subscription || {};
+    const history = Array.isArray(sub.paymentHistory) ? sub.paymentHistory : [];
+    // Newest first
+    const items = [...history].reverse();
+    return {
+      items,
+      total: items.length,
+      lastPayment: sub.lastPayment || null,
+      provider: sub.paymentProvider || null,
     };
   }
 
@@ -181,8 +291,15 @@ export class BillingService {
     }
 
     if (sub.paymentSubscriptionId && sub.paymentProvider) {
-      const provider = this.getProvider(sub.paymentProvider);
-      await provider.cancelSubscription({ subscriptionId: sub.paymentSubscriptionId, atPeriodEnd: true });
+      // Best-effort remote cancel only (we use one-time Razorpay orders, so
+      // paymentSubscriptionId is a payment ID, not a recurring subscription —
+      // provider cancel may fail and must never block the local upgrade).
+      try {
+        const provider = this.getProvider(sub.paymentProvider);
+        await provider.cancelSubscription({ subscriptionId: sub.paymentSubscriptionId, atPeriodEnd: true });
+      } catch (e: any) {
+        this.logger.warn(`Remote cancel skipped during upgrade (org=${organizationId}): ${e?.message || e}`);
+      }
     }
 
     org.subscription = {
@@ -247,22 +364,33 @@ export class BillingService {
     if (!sub?.plan) throw new BadRequestException('No active subscription to cancel');
 
     if (sub.paymentSubscriptionId && sub.paymentProvider) {
-      const provider = this.getProvider(sub.paymentProvider);
-      await provider.cancelSubscription({ subscriptionId: sub.paymentSubscriptionId, atPeriodEnd: true });
+      // Best-effort remote cancel only (we use one-time Razorpay orders, so
+      // paymentSubscriptionId is a payment ID like pay_*, not a recurring
+      // Razorpay subscription — provider cancel throws and must never 500
+      // the local cancel).
+      try {
+        const provider = this.getProvider(sub.paymentProvider);
+        await provider.cancelSubscription({ subscriptionId: sub.paymentSubscriptionId, atPeriodEnd: true });
+      } catch (e: any) {
+        this.logger.warn(`Remote cancel skipped (org=${organizationId}): ${e?.message || e}`);
+      }
     }
 
     org.subscription = {
       ...sub,
+      status: 'cancelled',
       cancelAtPeriodEnd: true,
+      cancelledAt: new Date(),
     };
     await org.save();
+    this.logger.log(`Subscription cancelled: org=${organizationId} plan=${sub.plan}`);
 
     await this.auditLogsService.log({
       organizationId,
       userId,
       action: 'subscription_changed',
       entity: 'subscription',
-      metadata: { plan: sub.plan, action: 'cancel' },
+      metadata: { plan: sub.plan, status: 'cancelled', action: 'cancel' },
     });
 
     return this.getSubscriptionStatus(organizationId);

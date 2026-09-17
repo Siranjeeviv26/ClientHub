@@ -70,8 +70,10 @@ export function RegisterPage() {
         organizationName: data.organizationName,
       });
       if (response.success) {
-        toast.success('Account created! Please sign in.');
-        navigate('/login');
+        toast.success('Account created! Choose a plan to get started.');
+        navigate('/');
+        // Scroll to pricing after LandingPage mounts
+        setTimeout(() => document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' }), 400);
       } else {
         toast.error(response.message || 'Registration failed');
       }
