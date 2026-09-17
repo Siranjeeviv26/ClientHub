@@ -109,8 +109,26 @@ export default function LandingPage() {
     (async () => {
       try {
         const res = await superAdminApi.getPublicPlans() as { success: boolean; data: Plan[] };
-        if (res.data) setPlans(res.data);
-      } catch { /* use empty array */ }
+        const arr = Array.isArray(res?.data) ? res.data : [];
+        if (arr.length) { setPlans(arr); return; }
+      } catch {}
+      // Fallback: direct fetch to cover http://localhost/api/v1, :3000, and proxy
+      const bases = [
+        (import.meta as any).env?.VITE_API_URL,
+        '/api/v1',
+        'http://localhost:3000/api/v1',
+        'http://localhost/api/v1',
+      ].filter(Boolean) as string[];
+      for (const b of bases) {
+        try {
+          const url = `${b.replace(/\/$/, '')}/public/plans`;
+          const r = await fetch(url, { headers: { Accept: 'application/json' } });
+          if (!r.ok) continue;
+          const j = await r.json();
+          const arr = Array.isArray(j?.data) ? j.data : Array.isArray(j) ? j : [];
+          if (arr.length) { setPlans(arr); return; }
+        } catch {}
+      }
     })();
   }, []);
 
