@@ -397,10 +397,9 @@ export default function LandingPage() {
             <h2 className="mt-4 text-3xl sm:text-5xl font-bold text-gray-900 tracking-tight">One platform, every tool</h2>
           </div>
         </div>
-        <div className="relative">
-          <div className="absolute left-0 top-0 bottom-0 w-24 bg-gradient-to-r from-white/80 to-transparent z-10 pointer-events-none" />
-          <div className="absolute right-0 top-0 bottom-0 w-24 bg-gradient-to-l from-white/80 to-transparent z-10 pointer-events-none" />
-          <div className="flex animate-marquee-slow w-max">
+        <div className="relative overflow-hidden"
+          style={{ WebkitMaskImage: 'linear-gradient(to right, transparent, black 8%, black 92%, transparent)', maskImage: 'linear-gradient(to right, transparent, black 8%, black 92%, transparent)' }}>
+          <div className="flex animate-marquee-slow w-max py-2">
             {[...modules, ...modules].map((m, i) => (
               <div key={`${m.name}-${i}`} className="flex flex-col items-center gap-3 p-5 mx-2 rounded-2xl border border-gray-200/80 bg-white hover:shadow-xl hover:border-gray-300 transition-all duration-500 cursor-default group hover:-translate-y-2 min-w-[100px]">
                 <div className="w-12 h-12 rounded-xl bg-gray-900 flex items-center justify-center shadow-lg shadow-gray-900/20 group-hover:scale-110 group-hover:rotate-6 transition-all duration-500">
