@@ -12,6 +12,7 @@ interface CreatedCredentials {
   organization: { _id: string; name: string; slug: string };
   admin: { _id: string; email: string; firstName: string; lastName: string; role: string };
   temporaryPassword: string;
+  paymentLink?: { url: string; expiresAt: string } | null;
 }
 
 export default function OrganizationsPage() {
@@ -26,8 +27,17 @@ export default function OrganizationsPage() {
   const [copied, setCopied] = useState(false);
   const [credentials, setCredentials] = useState<CreatedCredentials | null>(null);
   const [form, setForm] = useState({
-    name: '', slug: '', adminEmail: '', adminFirstName: '', adminLastName: '', adminPassword: '',
+    name: '', slug: '', adminEmail: '', adminFirstName: '', adminLastName: '', adminPassword: '', planSlug: '',
   });
+  const [plans, setPlans] = useState<{ _id: string; name: string; slug: string; price: number }[]>([]);
+
+  const openCreateModal = async () => {
+    setShowCreateModal(true);
+    try {
+      const res = await superAdminApi.getPlans() as { success: boolean; data: { _id: string; name: string; slug: string; price: number }[] };
+      if (Array.isArray(res.data)) setPlans(res.data);
+    } catch { /* plans dropdown optional */ }
+  };
 
   const fetchOrganizations = useCallback(async () => {
     try {
@@ -77,10 +87,11 @@ export default function OrganizationsPage() {
         adminFirstName: form.adminFirstName.trim(),
         adminLastName: form.adminLastName.trim(),
         adminPassword: form.adminPassword,
+        planSlug: form.planSlug || undefined,
       }) as { success: boolean; data: CreatedCredentials };
       setCredentials(res.data);
       setShowCreateModal(false);
-      setForm({ name: '', slug: '', adminEmail: '', adminFirstName: '', adminLastName: '', adminPassword: '' });
+      setForm({ name: '', slug: '', adminEmail: '', adminFirstName: '', adminLastName: '', adminPassword: '', planSlug: '' });
       fetchOrganizations();
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Failed to create organization');
@@ -104,7 +115,7 @@ export default function OrganizationsPage() {
           <h1 className="text-2xl font-bold text-gray-900">Organizations</h1>
           <p className="text-gray-500 mt-1">Manage platform organizations</p>
         </div>
-        <Button onClick={() => setShowCreateModal(true)} leftIcon={<Plus className="w-4 h-4" />}>Create Organization</Button>
+        <Button onClick={openCreateModal} leftIcon={<Plus className="w-4 h-4" />}>Create Organization</Button>
       </div>
 
       <div className="relative max-w-md">
@@ -207,6 +218,17 @@ export default function OrganizationsPage() {
                 <input type="text" value={form.adminPassword} onChange={(e) => setForm({ ...form, adminPassword: e.target.value })} placeholder="Min 8 characters" className={inputClass} />
               </div>
 
+              <div className="border-t border-gray-100 pt-4">
+                <p className="text-sm font-semibold text-gray-900 mb-1">Subscription Plan</p>
+                <p className="text-xs text-gray-500 mb-3">Select a plan to email a payment link (valid 2 days) to the admin. Leave empty for no plan.</p>
+                <select value={form.planSlug} onChange={(e) => setForm({ ...form, planSlug: e.target.value })} className={inputClass}>
+                  <option value="">No plan — skip payment link</option>
+                  {plans.map((p) => (
+                    <option key={p._id} value={p.slug}>{p.name} — ${p.price}/mo</option>
+                  ))}
+                </select>
+              </div>
+
               <div className="flex justify-end gap-3 pt-2">
                 <Button variant="ghost" onClick={() => setShowCreateModal(false)}>Cancel</Button>
                 <Button onClick={handleCreate} disabled={createLoading}>
@@ -240,6 +262,13 @@ export default function OrganizationsPage() {
                 <p className="text-xs text-gray-400 uppercase tracking-wider">Password</p>
                 <p className="text-gray-900 font-mono font-medium">{credentials.temporaryPassword}</p>
               </div>
+              {credentials.paymentLink && (
+                <div>
+                  <p className="text-xs text-gray-400 uppercase tracking-wider">Payment Link (valid 2 days)</p>
+                  <p className="text-gray-900 font-mono text-xs break-all">{credentials.paymentLink.url}</p>
+                  <p className="text-xs text-gray-500 mt-1">Expires {new Date(credentials.paymentLink.expiresAt).toLocaleString()} · also emailed to {credentials.admin.email}</p>
+                </div>
+              )}
             </div>
             <div className="flex justify-end gap-3 mt-6">
               <Button variant="outline" onClick={copyCredentials} leftIcon={copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}>

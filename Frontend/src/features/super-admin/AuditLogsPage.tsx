@@ -23,38 +23,62 @@ export default function SuperAdminAuditLogsPage() {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [actionFilter, setActionFilter] = useState('');
-  const [entityFilter, setEntityFilter] = useState('');
+  const [searchInput, setSearchInput] = useState('');
+  const [search, setSearch] = useState('');
+  const [orgFilter, setOrgFilter] = useState('');
+  const [orgs, setOrgs] = useState<{ _id: string; name: string }[]>([]);
 
   const fetchLogs = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await superAdminApi.getAuditLogs({ page, action: actionFilter || undefined, entity: entityFilter || undefined }) as { success: boolean; data: SuperAdminPaginatedResponse<AuditLogEntry> };
+      const res = await superAdminApi.getAuditLogs({ page, search: search || undefined, organizationId: orgFilter || undefined }) as { success: boolean; data: SuperAdminPaginatedResponse<AuditLogEntry> };
       setLogs(res.data?.items || []);
       setTotalPages(res.data?.pagination?.totalPages || 1);
     } catch { toast.error('Failed to load audit logs'); }
     finally { setLoading(false); }
-  }, [page, actionFilter, entityFilter]);
+  }, [page, search, orgFilter]);
 
   useEffect(() => { fetchLogs(); }, [fetchLogs]);
+
+  useEffect(() => {
+    const t = setTimeout(() => { setSearch(searchInput); setPage(1); }, 300);
+    return () => clearTimeout(t);
+  }, [searchInput]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await superAdminApi.getOrganizations({ limit: 100 }) as { success: boolean; data: { items: { _id: string; name: string }[] } };
+        setOrgs(res.data?.items || []);
+      } catch { /* org filter optional */ }
+    })();
+  }, []);
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Platform Audit Logs</h1>
-        <p className="text-gray-500 mt-1">Activity across all organizations</p>
+        <h1 className="text-2xl font-bold text-gray-900">Organizations Log</h1>
+        <p className="text-gray-500 mt-1">Each organization's stored activity — filter by organization to view its logs</p>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input type="text" placeholder="Filter by action..." value={actionFilter} onChange={(e) => { setActionFilter(e.target.value); setPage(1); }}
-            className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500" />
-        </div>
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input type="text" placeholder="Filter by entity..." value={entityFilter} onChange={(e) => { setEntityFilter(e.target.value); setPage(1); }}
-            className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500" />
+      <div className="bg-white rounded-2xl border border-gray-200/70 shadow-sm p-4">
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-[2]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+            <input type="text" placeholder="Search by action or entity..." value={searchInput} onChange={(e) => setSearchInput(e.target.value)}
+              className="w-full h-10 rounded-xl border border-gray-200 bg-gray-50 pl-9 pr-8 text-sm text-gray-900 placeholder:text-gray-400 focus:bg-white focus:border-primary-500 focus:ring-2 focus:ring-primary-500/15 focus:outline-none transition-all hover:border-gray-300" />
+            {searchInput && (
+              <button onClick={() => setSearchInput('')} aria-label="Clear search"
+                className="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 transition-colors">×</button>
+            )}
+          </div>
+          <select value={orgFilter} onChange={(e) => { setOrgFilter(e.target.value); setPage(1); }}
+            className="flex-1 h-10 rounded-xl border border-gray-200 bg-gray-50 px-3 text-sm text-gray-900 focus:bg-white focus:border-primary-500 focus:ring-2 focus:ring-primary-500/15 focus:outline-none transition-all hover:border-gray-300 cursor-pointer">
+            <option value="">All organizations</option>
+            {orgs.map((o) => (
+              <option key={o._id} value={o._id}>{o.name}</option>
+            ))}
+          </select>
         </div>
       </div>
 

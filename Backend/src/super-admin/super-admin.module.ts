@@ -12,6 +12,8 @@ import { Deal, DealSchema } from '../deals/schemas/deal.schema';
 import { Lead, LeadSchema } from '../leads/schemas/lead.schema';
 import { Payment, PaymentSchema } from '../payments/schemas/payment.schema';
 import { SystemSettings, SystemSettingsSchema } from './schemas/system-settings.schema';
+import { OrgPaymentLink, OrgPaymentLinkSchema } from '../billing/schemas/org-payment-link.schema';
+import { OrganizationMember, OrganizationMemberSchema } from '../organizations/schemas/organization-member.schema';
 
 @Module({
   imports: [
@@ -25,6 +27,8 @@ import { SystemSettings, SystemSettingsSchema } from './schemas/system-settings.
       { name: Lead.name, schema: LeadSchema },
       { name: Payment.name, schema: PaymentSchema },
       { name: SystemSettings.name, schema: SystemSettingsSchema },
+      { name: OrgPaymentLink.name, schema: OrgPaymentLinkSchema },
+      { name: OrganizationMember.name, schema: OrganizationMemberSchema },
     ]),
   ],
   controllers: [SuperAdminController, PublicPlansController],

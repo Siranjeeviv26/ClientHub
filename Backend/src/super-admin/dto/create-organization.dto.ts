@@ -37,4 +37,9 @@ export class CreateOrganizationWithAdminDto {
   @MinLength(8)
   @MaxLength(128)
   adminPassword: string;
+
+  @ApiPropertyOptional({ example: 'professional', description: 'Plan to attach; a 2-day payment link is emailed to the admin' })
+  @IsOptional()
+  @IsString()
+  planSlug?: string;
 }

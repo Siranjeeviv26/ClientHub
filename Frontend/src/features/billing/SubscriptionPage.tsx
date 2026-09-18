@@ -42,6 +42,8 @@ const STATUS_CONFIG: Record<
   expired: { label: "Expired", variant: "gray" },
   trialing: { label: "Trial", variant: "primary" },
   suspended: { label: "Suspended", variant: "danger" },
+  pending: { label: "Pending Payment", variant: "warning" },
+  none: { label: "No Plan", variant: "gray" },
 };
 
 // Clean status pill — solid dot + subtle ring, avoids Badge's conflicting dot classes
@@ -54,6 +56,8 @@ function StatusPill({ status, label }: { status: string; label: string }) {
     cancelled: "bg-red-50 border-red-200 text-red-700",
     expired: "bg-gray-100 border-gray-200 text-gray-600",
     suspended: "bg-red-50 border-red-200 text-red-700",
+    pending: "bg-amber-50 border-amber-200 text-amber-700",
+    none: "bg-gray-100 border-gray-200 text-gray-600",
   };
   const dots: Record<string, string> = {
     active: "bg-emerald-500",
@@ -63,6 +67,8 @@ function StatusPill({ status, label }: { status: string; label: string }) {
     cancelled: "bg-red-500",
     expired: "bg-gray-400",
     suspended: "bg-red-500",
+    pending: "bg-amber-500",
+    none: "bg-gray-400",
   };
   const key = (status || "").toLowerCase();
   return (
@@ -556,6 +562,13 @@ export default function SubscriptionPage() {
                         : "Unlimited",
                   },
                   {
+                    label: "Workspaces",
+                    value:
+                      (plan as any).workspaceLimit != null
+                        ? String((plan as any).workspaceLimit)
+                        : "Unlimited",
+                  },
+                  {
                     label: "Clients",
                     value: plan.clientLimit?.toLocaleString() ?? "—",
                   },
@@ -707,6 +720,7 @@ export default function SubscriptionPage() {
                   <div className="pt-3 border-t border-gray-100 text-xs text-gray-500 space-y-1">
                     <p>
                       {p.memberLimit ?? "Unlimited"} users ·{" "}
+                      {(p as any).workspaceLimit ?? "Unlimited"} workspaces ·{" "}
                       {p.clientLimit?.toLocaleString() ?? "—"} clients
                     </p>
                     <p>

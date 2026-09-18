@@ -316,7 +316,10 @@ export function SettingsPage() {
   const handleProfileSubmit = async (data: ProfileForm) => {
     setSaving(true);
     try {
-      const response = await usersApi.updateProfile(organization!._id, data);
+      // UpdateProfileDto accepts firstName/lastName/phone/jobTitle only —
+      // email is identity and can't change here, so strip it to avoid 400
+      const { email: _email, ...profileData } = data;
+      const response = await usersApi.updateProfile(organization!._id, profileData);
       if (response.success) {
         updateUser(response.data);
         toast.success("Profile updated");

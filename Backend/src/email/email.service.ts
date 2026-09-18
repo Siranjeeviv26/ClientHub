@@ -81,6 +81,15 @@ export class EmailService {
     });
   }
 
+  async sendOrgCreatedEmail(email: string, firstName: string, organizationName: string, tempPassword: string, loginUrl: string, payUrl?: string, expiryDate?: string): Promise<void> {
+    await this.sendEmail({
+      to: email,
+      subject: `Your ${organizationName} workspace is ready - ClientHub`,
+      html: this.getOrgCreatedTemplate(firstName, organizationName, email, tempPassword, loginUrl, payUrl, expiryDate),
+      text: `Your ${organizationName} workspace is ready. Sign in at ${loginUrl} with ${email} and the password shared by your administrator.${payUrl ? ` Complete your plan payment here (valid until ${expiryDate}): ${payUrl}` : ''}`,
+    });
+  }
+
   async sendProposalEmail(email: string, proposalNumber: string, title: string, total: number, clientUrl: string): Promise<void> {
     await this.sendEmail({
       to: email,
@@ -116,6 +125,17 @@ export class EmailService {
       subject: `Payment Reminder - Invoice ${invoiceNumber}`,
       html: this.getPaymentReminderTemplate(invoiceNumber, amountDue, dueDate, clientUrl),
       text: `Reminder: Invoice ${invoiceNumber} for $${amountDue} is due on ${dueDate}. Pay at ${clientUrl}`,
+    });
+  }
+
+  async sendPlanPaymentLinkEmail(email: string, organizationName: string, planName: string, amount: number, currency: string, payUrl: string, expiresAt: Date): Promise<void> {
+    const expiryDate = expiresAt.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    const displayAmount = `${currency} ${(amount / 100).toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+    await this.sendEmail({
+      to: email,
+      subject: `Complete your ${planName} subscription for ${organizationName} - ClientHub`,
+      html: this.getPlanPaymentLinkTemplate(organizationName, planName, displayAmount, payUrl, expiryDate),
+      text: `${organizationName} was created on ClientHub with the ${planName} plan (${displayAmount}). Complete payment here (valid until ${expiryDate}): ${payUrl}`,
     });
   }
 
@@ -372,6 +392,71 @@ export class EmailService {
             <div style="text-align: center; margin: 30px 0;">
               <a href="${clientUrl}" style="background: #d97706; color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; display: inline-block;">Pay Now</a>
             </div>
+          </div>
+        </body>
+      </html>
+    `;
+  }
+
+  private getPlanPaymentLinkTemplate(organizationName: string, planName: string, displayAmount: string, payUrl: string, expiryDate: string): string {
+    return `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="background: linear-gradient(135deg, #111827 0%, #374151 100%); padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
+            <h1 style="color: white; margin: 0; font-size: 28px;">ClientHub</h1>
+          </div>
+          <div style="background: #f9fafb; padding: 30px; border-radius: 0 0 12px 12px; border: 1px solid #e5e7eb;">
+            <h2 style="color: #1f2937; margin-top: 0;">Complete your subscription payment</h2>
+            <p style="color: #4b5563;">An organization <strong>${organizationName}</strong> was created for you with the <strong>${planName}</strong> plan.</p>
+            <div style="background: white; border-radius: 8px; padding: 20px; margin: 20px 0; border: 1px solid #e5e7eb; text-align: center;">
+              <p style="margin: 0; color: #6b7280; font-size: 14px;">Amount Due</p>
+              <p style="margin: 4px 0 0; color: #111827; font-size: 28px; font-weight: 700;">${displayAmount}</p>
+            </div>
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${payUrl}" style="background: #059669; color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; display: inline-block;">Pay Now</a>
+            </div>
+            <p style="color: #9ca3af; font-size: 14px;">Or copy this link: ${payUrl}</p>
+            <p style="color: #dc2626; font-size: 14px; font-weight: 600;">This link is valid until ${expiryDate} (2 days). After expiry, contact support for a new link.</p>
+          </div>
+        </body>
+      </html>
+    `;
+  }
+
+  private getOrgCreatedTemplate(firstName: string, organizationName: string, email: string, tempPassword: string, loginUrl: string, payUrl?: string, expiryDate?: string): string {
+    return `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="background: linear-gradient(135deg, #111827 0%, #374151 100%); padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
+            <h1 style="color: white; margin: 0; font-size: 28px;">ClientHub</h1>
+          </div>
+          <div style="background: #f9fafb; padding: 30px; border-radius: 0 0 12px 12px; border: 1px solid #e5e7eb;">
+            <h2 style="color: #1f2937; margin-top: 0;">Your workspace is ready, ${firstName}!</h2>
+            <p style="color: #4b5563;">An organization <strong>${organizationName}</strong> was created for you. Sign in with these credentials:</p>
+            <div style="background: white; border-radius: 8px; padding: 20px; margin: 20px 0; border: 1px solid #e5e7eb;">
+              <p style="margin: 0; color: #6b7280; font-size: 14px;">Email</p>
+              <p style="margin: 4px 0 12px; color: #111827; font-weight: 600;">${email}</p>
+              <p style="margin: 0; color: #6b7280; font-size: 14px;">Temporary password</p>
+              <p style="margin: 4px 0 0; color: #111827; font-weight: 600; font-family: monospace;">${tempPassword}</p>
+            </div>
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${loginUrl}" style="background: #111827; color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; display: inline-block;">Sign In</a>
+            </div>
+            ${payUrl ? `<div style="background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 8px; padding: 20px; margin: 20px 0; text-align: center;">
+              <p style="margin: 0; color: #065f46; font-weight: 600;">Complete your plan payment</p>
+              <p style="margin: 8px 0 16px; color: #047857; font-size: 14px;">Valid until ${expiryDate} (2 days)</p>
+              <a href="${payUrl}" style="background: #059669; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; display: inline-block;">Pay Now</a>
+            </div>` : `<p style="color: #9ca3af; font-size: 14px;">Please change your password after signing in (Settings → Security).</p>`}
           </div>
         </body>
       </html>

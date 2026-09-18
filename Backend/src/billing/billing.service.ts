@@ -2,8 +2,10 @@ import { Injectable, Logger, BadRequestException, NotFoundException } from '@nes
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { ConfigService } from '@nestjs/config';
+import { v4 as uuidv4 } from 'uuid';
 import { Organization, OrganizationDocument } from '../organizations/schemas/organization.schema';
 import { Plan, PlanDocument } from '../plans/schemas/plan.schema';
+import { OrgPaymentLink, OrgPaymentLinkDocument, OrgPaymentLinkStatus } from './schemas/org-payment-link.schema';
 import { PlansService } from '../plans/plans.service';
 import { UsageService } from '../usage/usage.service';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
@@ -19,6 +21,7 @@ export class BillingService {
   constructor(
     @InjectModel(Organization.name) private organizationModel: Model<OrganizationDocument>,
     @InjectModel(Plan.name) private planModel: Model<PlanDocument>,
+    @InjectModel(OrgPaymentLink.name) private payLinkModel: Model<OrgPaymentLinkDocument>,
     private readonly plansService: PlansService,
     private readonly usageService: UsageService,
     private readonly auditLogsService: AuditLogsService,
@@ -183,6 +186,152 @@ export class BillingService {
       lastPayment: sub.lastPayment || null,
       provider: sub.paymentProvider || null,
     };
+  }
+
+  // ---------- Organization payment links (super admin → email, 2-day validity) ----------
+
+  async createOrgPaymentLink(organizationId: string, planSlug: string, email: string): Promise<any> {
+    const org = await this.organizationModel.findById(organizationId).exec();
+    if (!org) throw new NotFoundException('Organization not found');
+    const plan = await this.plansService.findBySlug(planSlug);
+    if (!plan) throw new NotFoundException('Plan not found');
+    const expiresAt = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000); // 2 days
+    const link = await this.payLinkModel.create({
+      organizationId: new Types.ObjectId(organizationId),
+      planSlug,
+      email: email.toLowerCase(),
+      token: uuidv4(),
+      amount: Math.round((plan.price || 0) * 100),
+      currency: 'INR',
+      expiresAt,
+      status: OrgPaymentLinkStatus.PENDING,
+    });
+    this.logger.log(`Payment link created for org ${organizationId} plan ${planSlug}, expires ${expiresAt.toISOString()}`);
+    return link;
+  }
+
+  private async getValidPayLink(token: string): Promise<OrgPaymentLinkDocument> {
+    const link = await this.payLinkModel.findOne({ token }).exec();
+    if (!link) throw new NotFoundException('Payment link not found');
+    if (link.status === OrgPaymentLinkStatus.USED) {
+      throw new BadRequestException('This payment link has already been used');
+    }
+    if (link.status !== OrgPaymentLinkStatus.PENDING || link.expiresAt.getTime() < Date.now()) {
+      if (link.status === OrgPaymentLinkStatus.PENDING) {
+        link.status = OrgPaymentLinkStatus.EXPIRED;
+        await link.save();
+      }
+      throw new BadRequestException('This payment link has expired (valid for 2 days from sending)');
+    }
+    return link;
+  }
+
+  async getPayLinkDetails(token: string): Promise<any> {
+    const link = await this.getValidPayLink(token);
+    const org = await this.organizationModel.findById(link.organizationId).lean().exec();
+    const plan = await this.plansService.findBySlug(link.planSlug);
+    const key = this.configService.get<string>('RAZORPAY_KEY_ID') || this.configService.get<string>('app.razorpay.keyId') || 'rzp_test_TcyE5iXeV4CAqG';
+    return {
+      token: link.token,
+      organizationName: (org as any)?.name || 'Your organization',
+      plan: plan ? { name: plan.name, slug: plan.slug, price: plan.price, period: plan.period, features: plan.features } : { slug: link.planSlug },
+      amount: link.amount,
+      currency: link.currency,
+      email: link.email,
+      expiresAt: link.expiresAt,
+      key,
+    };
+  }
+
+  async createPayLinkOrder(token: string): Promise<any> {
+    const link = await this.getValidPayLink(token);
+    const provider = this.getProvider('razorpay') as any;
+    if (link.amount <= 0) {
+      return { orderId: `order_free_${Date.now()}`, amount: 0, currency: link.currency, key: this.configService.get<string>('RAZORPAY_KEY_ID') || this.configService.get<string>('app.razorpay.keyId') || 'rzp_test_TcyE5iXeV4CAqG' };
+    }
+    const order = await provider.createOrder({
+      amount: link.amount,
+      currency: link.currency,
+      receipt: `paylink_${link._id}_${Date.now()}`,
+      notes: { organizationId: link.organizationId.toString(), planSlug: link.planSlug, payLinkToken: token },
+    });
+    link.razorpayOrderId = order.id;
+    await link.save();
+    return {
+      orderId: order.id,
+      amount: order.amount,
+      currency: order.currency,
+      key: this.configService.get<string>('RAZORPAY_KEY_ID') || this.configService.get<string>('app.razorpay.keyId') || 'rzp_test_TcyE5iXeV4CAqG',
+    };
+  }
+
+  async verifyPayLinkPayment(token: string, body: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }): Promise<any> {
+    const link = await this.getValidPayLink(token);
+    const provider = this.getProvider('razorpay') as any;
+    const isValid = await provider.verifyPaymentSignature({
+      orderId: body.razorpay_order_id,
+      paymentId: body.razorpay_payment_id,
+      signature: body.razorpay_signature,
+    });
+    if (!isValid) throw new BadRequestException('Invalid payment signature');
+    const plan = await this.plansService.findBySlug(link.planSlug);
+    if (!plan) throw new NotFoundException('Plan not found');
+    const org = await this.organizationModel.findById(link.organizationId).exec();
+    if (!org) throw new NotFoundException('Organization not found');
+    const prevSub = (org.subscription as any) || {};
+    const periodEnd = new Date();
+    periodEnd.setMonth(periodEnd.getMonth() + 1);
+    const paymentRecord = {
+      provider: 'razorpay',
+      orderId: body.razorpay_order_id,
+      paymentId: body.razorpay_payment_id,
+      signature: body.razorpay_signature,
+      planSlug: link.planSlug,
+      amount: link.amount,
+      currency: link.currency,
+      status: 'captured',
+      paidAt: new Date(),
+      payLinkToken: token,
+    };
+    const paymentHistory = Array.isArray(prevSub.paymentHistory) ? prevSub.paymentHistory : [];
+    paymentHistory.push(paymentRecord);
+    org.subscription = {
+      ...prevSub,
+      plan: link.planSlug,
+      status: 'active',
+      currentPeriodStart: new Date(),
+      currentPeriodEnd: periodEnd,
+      cancelAtPeriodEnd: false,
+      paymentProvider: 'razorpay',
+      paymentSubscriptionId: body.razorpay_payment_id,
+      paymentOrderId: body.razorpay_order_id,
+      lastPayment: paymentRecord,
+      paymentHistory,
+    } as any;
+    if (plan.memberLimit) org.maxMembers = plan.memberLimit;
+    await org.save();
+    link.status = OrgPaymentLinkStatus.USED;
+    link.usedAt = new Date();
+    link.razorpayOrderId = body.razorpay_order_id;
+    link.razorpayPaymentId = body.razorpay_payment_id;
+    await link.save();
+    this.logger.log(`Pay-link payment verified: org=${link.organizationId} plan=${link.planSlug} payment=${body.razorpay_payment_id}`);
+    // Audit with the org admin as actor (pay link is paid without login)
+    try {
+      const adminMembership = await this.organizationModel.db
+        .collection('organization_members')
+        .findOne({ organizationId: new Types.ObjectId(link.organizationId.toString()), role: 'ADMIN', status: 'ACTIVE' });
+      if (adminMembership) {
+        await this.auditLogsService.log({
+          organizationId: link.organizationId.toString(),
+          userId: adminMembership.userId.toString(),
+          action: 'subscription_changed',
+          entity: 'subscription',
+          metadata: { planSlug: link.planSlug, status: 'active', action: 'pay_link_verify', paymentId: body.razorpay_payment_id, orderId: body.razorpay_order_id },
+        });
+      }
+    } catch { /* audit is best-effort */ }
+    return this.getSubscriptionStatus(link.organizationId.toString());
   }
 
   async startTrial(organizationId: string, planSlug: string, userId: string): Promise<any> {

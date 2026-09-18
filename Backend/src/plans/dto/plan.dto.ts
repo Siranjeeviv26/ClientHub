@@ -39,6 +39,12 @@ export class CreatePlanDto {
   @Min(1)
   memberLimit?: number;
 
+  @ApiPropertyOptional({ example: 5, description: 'Maximum workspaces an organization on this plan can own' })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  workspaceLimit?: number;
+
   @ApiPropertyOptional({ example: 500, description: 'Maximum clients allowed' })
   @IsOptional()
   @IsInt()
@@ -136,6 +142,12 @@ export class UpdatePlanDto {
   @IsInt()
   @Min(1)
   memberLimit?: number;
+
+  @ApiPropertyOptional({ example: 5 })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  workspaceLimit?: number;
 
   @ApiPropertyOptional({ example: 500 })
   @IsOptional()

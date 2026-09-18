@@ -3,27 +3,51 @@ import { Search, Loader2 } from 'lucide-react';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { Pagination } from '../../components/ui/Pagination';
+import { Tabs, TabPanel } from '../../components/ui/Tabs';
 import { superAdminApi } from '../../api/super-admin';
 import type { SuperAdminOrganization, SuperAdminPaginatedResponse } from '../../types';
 import toast from 'react-hot-toast';
 
-type StatusFilter = 'all' | 'active' | 'trialing' | 'cancelled' | 'suspended';
+type StatusFilter = 'all' | 'active' | 'cancelled' | 'suspended';
 
 const statusFilters: { value: StatusFilter; label: string }[] = [
   { value: 'all', label: 'All' },
   { value: 'active', label: 'Active' },
-  { value: 'trialing', label: 'Trial' },
   { value: 'cancelled', label: 'Cancelled' },
   { value: 'suspended', label: 'Suspended' },
 ];
 
+interface PlanPaymentItem {
+  organizationId: string;
+  organizationName: string;
+  organizationSlug: string;
+  provider?: string;
+  orderId?: string;
+  paymentId?: string;
+  planSlug?: string;
+  amount?: number;
+  currency?: string;
+  status?: string;
+  paidAt?: string;
+}
+
 export default function SubscriptionsPage() {
+  const [activeTab, setActiveTab] = useState<'subscriptions' | 'payments'>('subscriptions');
+
+  // Subscriptions tab
   const [subscriptions, setSubscriptions] = useState<SuperAdminOrganization[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+
+  // Payments tab (plan purchases)
+  const [planPayments, setPlanPayments] = useState<PlanPaymentItem[]>([]);
+  const [planLoading, setPlanLoading] = useState(false);
+  const [planSearch, setPlanSearch] = useState('');
+  const [planPage, setPlanPage] = useState(1);
+  const [planTotalPages, setPlanTotalPages] = useState(1);
 
   const fetchSubscriptions = useCallback(async () => {
     try {
@@ -37,6 +61,18 @@ export default function SubscriptionsPage() {
 
   useEffect(() => { fetchSubscriptions(); }, [fetchSubscriptions]);
 
+  const fetchPlanPayments = useCallback(async () => {
+    try {
+      setPlanLoading(true);
+      const res = await superAdminApi.getPlanPayments({ page: planPage, search: planSearch || undefined }) as { success: boolean; data: { items: PlanPaymentItem[]; pagination: { totalPages: number } } };
+      setPlanPayments(res.data?.items || []);
+      setPlanTotalPages(res.data?.pagination?.totalPages || 1);
+    } catch { toast.error('Failed to load plan purchases'); }
+    finally { setPlanLoading(false); }
+  }, [planPage, planSearch]);
+
+  useEffect(() => { if (activeTab === 'payments') fetchPlanPayments(); }, [fetchPlanPayments, activeTab]);
+
   const statusBadgeVariant = (status: string) => {
     switch (status) {
       case 'active': return 'success';
@@ -49,58 +85,125 @@ export default function SubscriptionsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Subscriptions</h1>
-        <p className="text-gray-500 mt-1">Overview of all platform subscriptions</p>
+        <h1 className="text-2xl font-bold text-gray-900">Billing</h1>
+        <p className="text-gray-500 mt-1">Subscriptions and plan purchases across the platform</p>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input type="text" placeholder="Search by organization..." value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500" />
-        </div>
-        <div className="flex gap-1 bg-gray-100 p-1 rounded-lg">
-          {statusFilters.map((filter) => (
-            <button key={filter.value} onClick={() => { setStatusFilter(filter.value); setPage(1); }}
-              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${statusFilter === filter.value ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
-              {filter.label}
-            </button>
-          ))}
-        </div>
-      </div>
+      <Tabs
+        tabs={[
+          { id: 'subscriptions', label: 'Subscriptions' },
+          { id: 'payments', label: 'Payments' },
+        ]}
+        activeTab={activeTab}
+        onChange={(id) => setActiveTab(id as 'subscriptions' | 'payments')}
+        variant="pills"
+      />
 
-      <Card className="overflow-hidden">
-        {loading ? (
-          <div className="flex items-center justify-center h-48"><Loader2 className="w-6 h-6 text-primary-500 animate-spin" /></div>
-        ) : subscriptions.length === 0 ? (
-          <div className="text-center py-12 text-gray-500">No subscriptions found</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-100">
-                  <th className="text-left px-6 py-4 text-sm font-medium text-gray-500">Organization</th>
-                  <th className="text-left px-6 py-4 text-sm font-medium text-gray-500">Slug</th>
-                  <th className="text-left px-6 py-4 text-sm font-medium text-gray-500">Plan</th>
-                  <th className="text-left px-6 py-4 text-sm font-medium text-gray-500">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {subscriptions.map((sub) => (
-                  <tr key={sub._id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4"><span className="text-gray-900 font-medium">{sub.name}</span></td>
-                    <td className="px-6 py-4"><span className="text-gray-500 font-mono text-sm">{sub.slug}</span></td>
-                    <td className="px-6 py-4"><span className="text-gray-600 capitalize">{sub.subscription?.plan ?? 'Free'}</span></td>
-                    <td className="px-6 py-4"><Badge variant={statusBadgeVariant(sub.subscription?.status ?? 'none')}>{sub.subscription?.status ?? 'none'}</Badge></td>
-                  </tr>
+      <TabPanel id="subscriptions" activeTab={activeTab}>
+        <div className="space-y-6">
+          <div className="bg-white rounded-2xl border border-gray-200/70 shadow-sm p-4">
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="relative flex-[2]">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                <input type="text" placeholder="Search by organization..." value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+                  className="w-full h-10 rounded-xl border border-gray-200 bg-gray-50 pl-9 pr-4 text-sm text-gray-900 placeholder:text-gray-400 focus:bg-white focus:border-primary-500 focus:ring-2 focus:ring-primary-500/15 focus:outline-none transition-all hover:border-gray-300" />
+              </div>
+              <div className="flex gap-1 bg-gray-100 p-1 rounded-xl self-start">
+                {statusFilters.map((filter) => (
+                  <button key={filter.value} onClick={() => { setStatusFilter(filter.value); setPage(1); }}
+                    className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${statusFilter === filter.value ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+                    {filter.label}
+                  </button>
                 ))}
-              </tbody>
-            </table>
+              </div>
+            </div>
           </div>
-        )}
-      </Card>
 
-      {totalPages > 1 && <div className="flex justify-center"><Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} /></div>}
+          <Card className="overflow-hidden">
+            {loading ? (
+              <div className="flex items-center justify-center h-48"><Loader2 className="w-6 h-6 text-primary-500 animate-spin" /></div>
+            ) : subscriptions.length === 0 ? (
+              <div className="text-center py-12 text-gray-500">No subscriptions found</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-gray-100">
+                      <th className="text-left px-6 py-4 text-sm font-medium text-gray-500">Organization</th>
+                      <th className="text-left px-6 py-4 text-sm font-medium text-gray-500">Slug</th>
+                      <th className="text-left px-6 py-4 text-sm font-medium text-gray-500">Plan</th>
+                      <th className="text-left px-6 py-4 text-sm font-medium text-gray-500">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {subscriptions.map((sub) => (
+                      <tr key={sub._id} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-6 py-4"><span className="text-gray-900 font-medium">{sub.name}</span></td>
+                        <td className="px-6 py-4"><span className="text-gray-500 font-mono text-sm">{sub.slug}</span></td>
+                        <td className="px-6 py-4"><span className="text-gray-600 capitalize">{sub.subscription?.plan ?? 'Free'}</span></td>
+                        <td className="px-6 py-4"><Badge variant={statusBadgeVariant(sub.subscription?.status ?? 'none')}>{sub.subscription?.status ?? 'none'}</Badge></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
+
+          {totalPages > 1 && <div className="flex justify-center"><Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} /></div>}
+        </div>
+      </TabPanel>
+
+      <TabPanel id="payments" activeTab={activeTab}>
+        <div className="space-y-6">
+          <div className="bg-white rounded-2xl border border-gray-200/70 shadow-sm p-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+              <input type="text" placeholder="Search org, plan, order or payment..." value={planSearch} onChange={(e) => { setPlanSearch(e.target.value); setPlanPage(1); }}
+                className="w-full h-10 rounded-xl border border-gray-200 bg-gray-50 pl-9 pr-4 text-sm text-gray-900 placeholder:text-gray-400 focus:bg-white focus:border-primary-500 focus:ring-2 focus:ring-primary-500/15 focus:outline-none transition-all hover:border-gray-300" />
+            </div>
+          </div>
+
+          <Card className="overflow-hidden">
+            {planLoading ? (
+              <div className="flex items-center justify-center h-48"><Loader2 className="w-6 h-6 text-primary-500 animate-spin" /></div>
+            ) : planPayments.length === 0 ? (
+              <div className="text-center py-12 text-gray-500">No plan purchases yet — Razorpay checkouts appear here automatically</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-gray-100">
+                      <th className="text-left px-6 py-4 text-sm font-medium text-gray-500">Date</th>
+                      <th className="text-left px-6 py-4 text-sm font-medium text-gray-500">Organization</th>
+                      <th className="text-left px-6 py-4 text-sm font-medium text-gray-500">Plan</th>
+                      <th className="text-left px-6 py-4 text-sm font-medium text-gray-500">Amount</th>
+                      <th className="text-left px-6 py-4 text-sm font-medium text-gray-500">Order ID</th>
+                      <th className="text-left px-6 py-4 text-sm font-medium text-gray-500">Payment ID</th>
+                      <th className="text-left px-6 py-4 text-sm font-medium text-gray-500">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {planPayments.map((p, i) => (
+                      <tr key={`${p.paymentId || p.orderId || i}`} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-6 py-4"><span className="text-gray-500 text-sm whitespace-nowrap">{p.paidAt ? new Date(p.paidAt).toLocaleString() : '—'}</span></td>
+                        <td className="px-6 py-4"><span className="text-gray-900 font-medium">{p.organizationName}</span><span className="block text-xs text-gray-400 font-mono">{p.organizationSlug}</span></td>
+                        <td className="px-6 py-4"><Badge variant="primary">{p.planSlug}</Badge></td>
+                        <td className="px-6 py-4"><span className="text-gray-900 font-medium">{p.currency || 'INR'} {(Number(p.amount || 0) / 100).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></td>
+                        <td className="px-6 py-4"><span className="text-gray-500 text-xs font-mono">{p.orderId || '—'}</span></td>
+                        <td className="px-6 py-4"><span className="text-gray-500 text-xs font-mono">{p.paymentId || '—'}</span></td>
+                        <td className="px-6 py-4"><Badge variant={p.status === 'captured' ? 'success' : 'default'}>{p.status}</Badge></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
+
+          {planTotalPages > 1 && <div className="flex justify-center"><Pagination currentPage={planPage} totalPages={planTotalPages} onPageChange={setPlanPage} /></div>}
+        </div>
+      </TabPanel>
     </div>
   );
 }

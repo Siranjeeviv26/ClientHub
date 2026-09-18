@@ -7,7 +7,7 @@ export const superAdminApi = {
   getOrganization: (id: string) =>
     api.get(`/super-admin/organizations/${id}`),
 
-  createOrganization: (data: { name: string; slug?: string; adminEmail: string; adminFirstName: string; adminLastName: string; adminPassword: string }) =>
+  createOrganization: (data: { name: string; slug?: string; adminEmail: string; adminFirstName: string; adminLastName: string; adminPassword: string; planSlug?: string }) =>
     api.post('/super-admin/organizations', data),
 
   suspendOrganization: (id: string) =>
@@ -21,6 +21,18 @@ export const superAdminApi = {
 
   getUser: (id: string) =>
     api.get(`/super-admin/users/${id}`),
+
+  getRoles: () =>
+    api.get('/super-admin/roles'),
+
+  createRole: (data: { name: string; label: string; description?: string; permissions: string[] }) =>
+    api.post('/super-admin/roles', data),
+
+  updateRole: (name: string, data: { label?: string; description?: string; permissions?: string[] }) =>
+    api.patch(`/super-admin/roles/${name}`, data),
+
+  deleteRole: (name: string) =>
+    api.delete(`/super-admin/roles/${name}`),
 
   suspendUser: (id: string) =>
     api.patch(`/super-admin/users/${id}/suspend`),
@@ -57,6 +69,9 @@ export const superAdminApi = {
 
   getPayments: (params?: Record<string, any>) =>
     api.get('/super-admin/payments', params),
+
+  getPlanPayments: (params?: Record<string, any>) =>
+    api.get('/super-admin/payments/plans', params),
 
   getSystemSettings: () =>
     api.get('/super-admin/settings'),

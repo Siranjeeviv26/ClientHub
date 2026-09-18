@@ -31,19 +31,25 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
     try {
       const response = await organizationsApi.getAll();
       if (response.success && response.data) {
-        setOrganizations(response.data);
+        const list = (response.data || []).filter((o: any) => o && o._id);
+        setOrganizations(list);
         // Set current organization from localStorage or first org
         const storedOrg = localStorage.getItem('organization');
         if (storedOrg) {
           const parsed = JSON.parse(storedOrg);
-          const found = response.data.find((o) => o._id === parsed._id);
+          const found = list.find((o) => o._id === parsed._id);
           if (found) {
             setOrganizationState(found);
-          } else if (response.data.length > 0) {
-            setOrganizationState(response.data[0]);
+          } else if (list.length > 0) {
+            setOrganizationState(list[0]);
+          } else {
+            setOrganizationState(null);
+            localStorage.removeItem('organization');
           }
-        } else if (response.data.length > 0) {
-          setOrganizationState(response.data[0]);
+        } else if (list.length > 0) {
+          setOrganizationState(list[0]);
+        } else {
+          setOrganizationState(null);
         }
       }
     } catch (error) {

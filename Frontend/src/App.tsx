@@ -130,6 +130,11 @@ const SuperAdminUsers = lazy(() =>
     default: m.default,
   })),
 );
+const SuperAdminRoles = lazy(() =>
+  import("./features/super-admin/RolesPage").then((m) => ({
+    default: m.default,
+  })),
+);
 const SuperAdminSubscriptions = lazy(() =>
   import("./features/super-admin/SubscriptionsPage").then((m) => ({
     default: m.default,
@@ -142,11 +147,6 @@ const SuperAdminPlans = lazy(() =>
 );
 const SuperAdminAuditLogs = lazy(() =>
   import("./features/super-admin/AuditLogsPage").then((m) => ({
-    default: m.default,
-  })),
-);
-const SuperAdminPayments = lazy(() =>
-  import("./features/super-admin/PaymentsPage").then((m) => ({
     default: m.default,
   })),
 );
@@ -186,6 +186,11 @@ const VerifyEmailPage = lazy(() =>
 );
 const LandingPage = lazy(() =>
   import("./features/landing/LandingPage").then((m) => ({
+    default: m.default,
+  })),
+);
+const PayPage = lazy(() =>
+  import("./features/billing/PayPage").then((m) => ({
     default: m.default,
   })),
 );
@@ -274,6 +279,13 @@ function App() {
         <Route path="/" element={
           <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><LoadingSpinner size="lg" /></div>}>
             <LandingPage />
+          </Suspense>
+        } />
+
+        {/* Public plan payment link (emailed, valid 2 days, no login) */}
+        <Route path="/pay/:token" element={
+          <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><LoadingSpinner size="lg" /></div>}>
+            <PayPage />
           </Suspense>
         } />
 
@@ -557,6 +569,13 @@ function App() {
                   </Suspense>
                 </ErrorBoundary>
               } />
+              <Route path="roles" element={
+                <ErrorBoundary>
+                  <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><LoadingSpinner size="lg" /></div>}>
+                    <SuperAdminRoles />
+                  </Suspense>
+                </ErrorBoundary>
+              } />
               <Route path="subscriptions" element={
                 <ErrorBoundary>
                   <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><LoadingSpinner size="lg" /></div>}>
@@ -575,13 +594,6 @@ function App() {
                 <ErrorBoundary>
                   <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><LoadingSpinner size="lg" /></div>}>
                     <SuperAdminAuditLogs />
-                  </Suspense>
-                </ErrorBoundary>
-              } />
-              <Route path="payments" element={
-                <ErrorBoundary>
-                  <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><LoadingSpinner size="lg" /></div>}>
-                    <SuperAdminPayments />
                   </Suspense>
                 </ErrorBoundary>
               } />

@@ -23,6 +23,9 @@ export class Plan {
   @Prop({ type: Number, required: false, min: 1 })
   memberLimit?: number;
 
+  @Prop({ type: Number, required: false, min: 1 })
+  workspaceLimit?: number;
+
   @Prop({ type: Number, default: 100 })
   clientLimit: number;
 

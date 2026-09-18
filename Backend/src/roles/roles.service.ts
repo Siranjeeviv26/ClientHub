@@ -45,6 +45,9 @@ export class RolesService {
   }
 
   async getAllRoles(organizationId?: string): Promise<{ _id?: string; value: string; label: string; description?: string; permissions: string[]; isSystem?: boolean }[]> {
+    // SUPER_ADMIN is platform-level and never assignable inside organizations
+    const withoutSuperAdmin = <T extends { value: string }>(list: T[]): T[] =>
+      list.filter((r) => r.value !== Role.SUPER_ADMIN);
     if (organizationId && !this.defaultsEnsured) {
       await this.ensureDefaultRoles(organizationId);
       this.defaultsEnsured = true;
@@ -72,42 +75,42 @@ export class RolesService {
       }
       // If no org roles found, fallback to static
       if (map.size === 0) {
-        return getRoleHierarchy().map((role) => ({
+        return withoutSuperAdmin(getRoleHierarchy().map((role) => ({
           value: role,
           label: this.getRoleLabel(role),
           description: this.getRoleDescription(role),
           permissions: RolePermissions[role] || [],
           isSystem: true,
-        }));
+        })));
       }
-      return Array.from(map.values()).map((r) => ({
+      return withoutSuperAdmin(Array.from(map.values()).map((r) => ({
         _id: r._id.toString(),
         value: r.name,
         label: r.label,
         description: r.description,
         permissions: r.permissions || [],
         isSystem: r.isSystem,
-      }));
+      })));
     }
     // No org - return static + global system roles
     const systemRoles = await this.roleModel.find({ isSystem: true, organizationId: { $exists: false } }).exec();
     if (systemRoles.length > 0) {
-      return systemRoles.map((r) => ({
+      return withoutSuperAdmin(systemRoles.map((r) => ({
         _id: r._id.toString(),
         value: r.name,
         label: r.label,
         description: r.description,
         permissions: r.permissions || [],
         isSystem: r.isSystem,
-      }));
+      })));
     }
-    return getRoleHierarchy().map((role) => ({
+    return withoutSuperAdmin(getRoleHierarchy().map((role) => ({
       value: role,
       label: this.getRoleLabel(role),
       description: this.getRoleDescription(role),
       permissions: RolePermissions[role] || [],
       isSystem: true,
-    }));
+    })));
   }
 
   async getRolePermissions(role: string, organizationId?: string): Promise<string[]> {
@@ -182,6 +185,10 @@ export class RolesService {
   }
 
   async updateRole(organizationId: string, roleName: string, data: { label?: string; description?: string; permissions?: string[] }) {
+    // SUPER_ADMIN is platform-level and can never be managed inside an org
+    if (roleName?.toUpperCase() === Role.SUPER_ADMIN) {
+      throw new BadRequestException('SUPER_ADMIN role cannot be managed within an organization');
+    }
     const role = await this.roleModel.findOne({ organizationId: new Types.ObjectId(organizationId), name: roleName }).exec();
     // Also allow updating system role's permissions per-org (creates org-specific override if global)
     let target = role;
@@ -228,6 +235,98 @@ export class RolesService {
     // This check is done in controller/service caller if needed
     await this.roleModel.findByIdAndDelete(role._id);
     this.logger.log(`Custom role deleted: ${roleName} for org ${organizationId}`);
+    return { message: 'Role deleted' };
+  }
+
+  // ---------- Platform-wide (super admin) role templates ----------
+  // Global roles have NO organizationId. System enum roles fall back to the
+  // static RolePermissions list until a super admin saves an override.
+  // Because getRolePermissions() prefers `{ isSystem: true }` docs, a global
+  // custom role is visible to every organization and selectable in plans.
+
+  async getGlobalRoles(): Promise<{ _id?: string; value: string; label: string; description?: string; permissions: string[]; isSystem?: boolean; isCustom?: boolean }[]> {
+    const docs = await this.roleModel.find({ organizationId: { $exists: false } }).sort({ isSystem: -1, name: 1 }).exec();
+    const byName = new Map<string, any>();
+    for (const d of docs) byName.set(d.name, d);
+    // Include enum system roles that have no stored override yet
+    const out: any[] = [];
+    for (const role of getRoleHierarchy()) {
+      const d = byName.get(role);
+      byName.delete(role);
+      out.push({
+        _id: d?._id?.toString(),
+        value: role,
+        label: d?.label || this.getRoleLabel(role),
+        description: d?.description ?? this.getRoleDescription(role),
+        permissions: d?.permissions || RolePermissions[role] || [],
+        isSystem: true,
+        isCustom: false,
+      });
+    }
+    // Any extra global custom roles
+    for (const d of byName.values()) {
+      out.push({
+        _id: d._id.toString(),
+        value: d.name,
+        label: d.label,
+        description: d.description,
+        permissions: d.permissions || [],
+        isSystem: d.isSystem,
+        isCustom: true,
+      });
+    }
+    return out;
+  }
+
+  async createGlobalRole(data: { name: string; label: string; description?: string; permissions: string[] }, createdBy?: string) {
+    const name = data.name.trim().toUpperCase().replace(/\s+/g, '_');
+    if (!/^[A-Z0-9_]+$/.test(name)) throw new BadRequestException('Role name must be uppercase alphanumeric with underscores');
+    if (getRoleHierarchy().includes(name as Role)) throw new ConflictException('Cannot create role with system name');
+    const existing = await this.roleModel.findOne({ name, organizationId: { $exists: false } }).exec();
+    if (existing) throw new ConflictException('Role with this name already exists');
+    const role = await this.roleModel.create({
+      name,
+      label: data.label.trim(),
+      description: data.description?.trim(),
+      permissions: data.permissions || [],
+      isSystem: true,
+      createdBy: createdBy ? new Types.ObjectId(createdBy) : undefined,
+    });
+    this.logger.log(`Global role created by super admin: ${name}`);
+    return role;
+  }
+
+  async updateGlobalRole(roleName: string, data: { label?: string; description?: string; permissions?: string[] }) {
+    const name = roleName.trim().toUpperCase();
+    let target = await this.roleModel.findOne({ name, organizationId: { $exists: false } }).exec();
+    if (!target) {
+      // No stored doc yet — create an override from the enum (system roles only)
+      const enumPerms = (RolePermissions as Record<string, string[]>)[name];
+      if (!enumPerms) throw new NotFoundException('Role not found');
+      target = await this.roleModel.create({
+        name,
+        label: data.label || this.getRoleLabel(name as Role),
+        description: data.description ?? this.getRoleDescription(name as Role),
+        permissions: data.permissions ?? enumPerms,
+        isSystem: true,
+      });
+      this.logger.log(`Global role override created by super admin: ${name}`);
+      return target;
+    }
+    if (data.label !== undefined) target.label = data.label;
+    if (data.description !== undefined) target.description = data.description;
+    if (data.permissions !== undefined) target.permissions = data.permissions;
+    await target.save();
+    this.logger.log(`Global role updated by super admin: ${name}`);
+    return target;
+  }
+
+  async deleteGlobalRole(roleName: string) {
+    const name = roleName.trim().toUpperCase();
+    if (getRoleHierarchy().includes(name as Role)) throw new BadRequestException('Cannot delete system role');
+    const role = await this.roleModel.findOneAndDelete({ name, organizationId: { $exists: false } }).exec();
+    if (!role) throw new NotFoundException('Role not found');
+    this.logger.log(`Global role deleted by super admin: ${name}`);
     return { message: 'Role deleted' };
   }
 

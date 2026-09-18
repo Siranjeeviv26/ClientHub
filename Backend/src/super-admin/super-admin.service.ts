@@ -2,6 +2,8 @@ import { Injectable, NotFoundException, BadRequestException, ConflictException, 
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import * as bcrypt from 'bcryptjs';
+import { v4 as uuidv4 } from 'uuid';
+import { ConfigService } from '@nestjs/config';
 import { Organization, OrganizationDocument } from '../organizations/schemas/organization.schema';
 import { User, UserDocument } from '../auth/schemas/user.schema';
 import { Plan, PlanDocument } from '../plans/schemas/plan.schema';
@@ -11,6 +13,9 @@ import { Deal, DealDocument } from '../deals/schemas/deal.schema';
 import { Lead, LeadDocument } from '../leads/schemas/lead.schema';
 import { Payment, PaymentDocument } from '../payments/schemas/payment.schema';
 import { SystemSettings, SystemSettingsDocument } from './schemas/system-settings.schema';
+import { OrgPaymentLink, OrgPaymentLinkDocument, OrgPaymentLinkStatus } from '../billing/schemas/org-payment-link.schema';
+import { OrganizationMember, OrganizationMemberDocument } from '../organizations/schemas/organization-member.schema';
+import { EmailService } from '../email/email.service';
 
 @Injectable()
 export class SuperAdminService {
@@ -26,6 +31,10 @@ export class SuperAdminService {
     @InjectModel(Lead.name) private leadModel: Model<LeadDocument>,
     @InjectModel(Payment.name) private paymentModel: Model<PaymentDocument>,
     @InjectModel(SystemSettings.name) private settingsModel: Model<SystemSettingsDocument>,
+    @InjectModel(OrgPaymentLink.name) private payLinkModel: Model<OrgPaymentLinkDocument>,
+    @InjectModel(OrganizationMember.name) private memberModel: Model<OrganizationMemberDocument>,
+    private readonly emailService: EmailService,
+    private readonly configService: ConfigService,
   ) {}
 
   // Organizations
@@ -36,6 +45,7 @@ export class SuperAdminService {
     adminFirstName: string;
     adminLastName: string;
     adminPassword: string;
+    planSlug?: string;
   }) {
     const slug = dto.slug || dto.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
     const existingSlug = await this.organizationModel.findOne({ slug });
@@ -73,12 +83,73 @@ export class SuperAdminService {
       emailVerified: true,
     });
 
+    // Membership is what grants workspace access (org listing, switching,
+    // member checks) — without it the admin sees only Settings
+    await this.memberModel.create({
+      userId: adminUser._id,
+      organizationId: organization._id,
+      role: 'ADMIN',
+      status: 'ACTIVE',
+      joinedAt: new Date(),
+    });
+
     this.logger.log(`Organization created by super admin: ${organization.name} (${organization.slug}) with admin ${adminUser.email}`);
+
+    // Optional plan: mark subscription pending + email a 2-day payment link
+    let paymentLink: { url: string; expiresAt: Date } | null = null;
+    if (dto.planSlug) {
+      const plan = await this.planModel.findOne({ slug: dto.planSlug }).lean().exec();
+      if (!plan) throw new NotFoundException('Plan not found');
+      (organization as any).subscription = { plan: plan.slug, status: 'pending' };
+      await organization.save();
+      const expiresAt = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000); // 2 days
+      const link = await this.payLinkModel.create({
+        organizationId: organization._id,
+        planSlug: plan.slug,
+        email: adminUser.email,
+        token: uuidv4(),
+        amount: Math.round((plan.price || 0) * 100),
+        currency: 'INR',
+        expiresAt,
+        status: OrgPaymentLinkStatus.PENDING,
+      });
+      const clientUrl = this.configService.get<string>('app.clientUrl') || 'http://localhost:5173';
+      const payUrl = `${clientUrl}/pay/${link.token}`;
+      try {
+        await this.emailService.sendPlanPaymentLinkEmail(
+          adminUser.email, organization.name, plan.name,
+          Math.round((plan.price || 0) * 100), 'INR', payUrl, expiresAt,
+        );
+      } catch (e: any) {
+        // Mail/queue must never fail org creation (e.g. Redis down locally)
+        this.logger.warn(`Payment-link email failed for ${adminUser.email}: ${e?.message || e}`);
+      }
+      this.logger.log(`Payment link emailed to ${adminUser.email} for org ${organization.name} plan ${plan.slug}, expires ${expiresAt.toISOString()}`);
+      paymentLink = { url: payUrl, expiresAt };
+    }
+
+    // Always notify the new admin by email (credentials + login link,
+    // plus the payment link when a plan was selected)
+    const loginBase = this.configService.get<string>('app.clientUrl') || 'http://localhost:5173';
+    try {
+      await this.emailService.sendOrgCreatedEmail(
+        adminUser.email,
+        adminUser.firstName,
+        organization.name,
+        dto.adminPassword,
+        `${loginBase}/login`,
+        paymentLink?.url,
+        paymentLink ? paymentLink.expiresAt.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : undefined,
+      );
+    } catch (e: any) {
+      this.logger.warn(`Org-created email failed for ${adminUser.email}: ${e?.message || e}`);
+    }
 
     return {
       organization: { _id: organization._id, name: organization.name, slug: organization.slug },
       admin: { _id: adminUser._id, email: adminUser.email, firstName: adminUser.firstName, lastName: adminUser.lastName, role: adminUser.role },
       temporaryPassword: dto.adminPassword,
+      paymentLink,
     };
   }
 
@@ -293,7 +364,7 @@ export class SuperAdminService {
   }
 
   // Platform-wide Audit Logs
-  async getPlatformAuditLogs(query: { page?: number; limit?: number; action?: string; entity?: string; startDate?: string; endDate?: string }) {
+  async getPlatformAuditLogs(query: { page?: number; limit?: number; action?: string; entity?: string; organizationId?: string; search?: string; startDate?: string; endDate?: string }) {
     const page = Math.max(1, query.page || 1);
     const limit = Math.min(100, Math.max(1, query.limit || 20));
     const skip = (page - 1) * limit;
@@ -301,6 +372,16 @@ export class SuperAdminService {
     const filter: Record<string, any> = {};
     if (query.action) filter.action = query.action;
     if (query.entity) filter.entity = query.entity;
+    if (query.search) {
+      filter.$or = [
+        { action: { $regex: query.search, $options: 'i' } },
+        { entity: { $regex: query.search, $options: 'i' } },
+      ];
+    }
+    // Per-organization view — only apply valid ObjectIds to avoid CastError
+    if (query.organizationId && /^[0-9a-f]{24}$/i.test(query.organizationId)) {
+      filter.organizationId = new Types.ObjectId(query.organizationId);
+    }
     if (query.startDate || query.endDate) {
       filter.createdAt = {};
       if (query.startDate) filter.createdAt.$gte = new Date(query.startDate);
@@ -416,6 +497,67 @@ export class SuperAdminService {
         .exec(),
       this.paymentModel.countDocuments(filter).exec(),
     ]);
+
+    return {
+      items,
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit), hasNextPage: page < Math.ceil(total / limit), hasPrevPage: page > 1 },
+    };
+  }
+
+  // Platform-wide plan purchase history (Razorpay payments stored on each
+  // organization's subscription.paymentHistory)
+  async getAllPlanPayments(query: { page?: number; limit?: number; search?: string }) {
+    const page = Math.max(1, query.page || 1);
+    const limit = Math.min(100, Math.max(1, query.limit || 20));
+    const skip = (page - 1) * limit;
+
+    const pipeline: any[] = [
+      { $match: { 'subscription.paymentHistory': { $exists: true, $ne: [] } } },
+      { $unwind: '$subscription.paymentHistory' },
+    ];
+    if (query.search) {
+      pipeline.push({
+        $match: {
+          $or: [
+            { name: { $regex: query.search, $options: 'i' } },
+            { slug: { $regex: query.search, $options: 'i' } },
+            { 'subscription.paymentHistory.paymentId': { $regex: query.search, $options: 'i' } },
+            { 'subscription.paymentHistory.orderId': { $regex: query.search, $options: 'i' } },
+            { 'subscription.paymentHistory.planSlug': { $regex: query.search, $options: 'i' } },
+          ],
+        },
+      });
+    }
+    pipeline.push({ $sort: { 'subscription.paymentHistory.paidAt': -1 } });
+    pipeline.push({
+      $facet: {
+        items: [
+          { $skip: skip },
+          { $limit: limit },
+          {
+            $project: {
+              _id: 0,
+              organizationId: '$_id',
+              organizationName: '$name',
+              organizationSlug: '$slug',
+              provider: '$subscription.paymentHistory.provider',
+              orderId: '$subscription.paymentHistory.orderId',
+              paymentId: '$subscription.paymentHistory.paymentId',
+              planSlug: '$subscription.paymentHistory.planSlug',
+              amount: '$subscription.paymentHistory.amount',
+              currency: '$subscription.paymentHistory.currency',
+              status: '$subscription.paymentHistory.status',
+              paidAt: '$subscription.paymentHistory.paidAt',
+            },
+          },
+        ],
+        total: [{ $count: 'count' }],
+      },
+    });
+
+    const res = await this.organizationModel.aggregate(pipeline).exec();
+    const items = res?.[0]?.items || [];
+    const total = res?.[0]?.total?.[0]?.count || 0;
 
     return {
       items,

@@ -450,7 +450,7 @@ export function UsersPage() {
       >
         <form onSubmit={handleSubmitInvite(handleInvite)} className="space-y-4" id="invite-user-form">
           <Input label="Email *" type="email" placeholder="colleague@company.com" error={inviteErrors.email?.message} {...registerInvite('email')} />
-          <Select label="Role *" options={(availableRoles.length ? availableRoles.map(r => ({ value: r.value, label: r.label })) : ROLE_OPTIONS).filter(o => isAdmin || o.value !== 'ADMIN')} value={watchInvite('role')} onChange={(e) => setInviteValue('role', e.target.value as any)} error={inviteErrors.role?.message} />
+          <Select label="Role *" options={(availableRoles.length ? availableRoles.filter(r => r.value !== 'SUPER_ADMIN').map(r => ({ value: r.value, label: r.label })) : ROLE_OPTIONS).filter(o => isAdmin || o.value !== 'ADMIN')} value={watchInvite('role')} onChange={(e) => setInviteValue('role', e.target.value as any)} error={inviteErrors.role?.message} />
           <p className="text-xs text-gray-500 flex items-center gap-1"><AtSign className="w-3 h-3" /> Invitation expires in 7 days</p>
         </form>
       </Modal>
@@ -504,7 +504,7 @@ export function UsersPage() {
             <Input label="Email *" type="email" error={errors.email?.message} {...register('email')} />
             <Input label="Phone" placeholder="+1 (555) 123-4567" {...register('phone')} />
             <div className="w-full">
-              <Select label="Role *" options={(availableRoles.length ? availableRoles.map(r => ({ value: r.value, label: r.label })) : ROLE_OPTIONS).filter(o => isAdmin || o.value !== 'ADMIN')} value={watch('role')} onChange={(e) => setValue('role', e.target.value as any)} error={errors.role?.message} />
+              <Select label="Role *" options={(availableRoles.length ? availableRoles.filter(r => r.value !== 'SUPER_ADMIN').map(r => ({ value: r.value, label: r.label })) : ROLE_OPTIONS).filter(o => isAdmin || o.value !== 'ADMIN')} value={watch('role')} onChange={(e) => setValue('role', e.target.value as any)} error={errors.role?.message} />
               {!isAdmin && watch('role') === 'ADMIN' && <p className="text-xs text-amber-600 mt-1">Only ADMIN can assign ADMIN</p>}
             </div>
             <div className="flex items-end pb-2">

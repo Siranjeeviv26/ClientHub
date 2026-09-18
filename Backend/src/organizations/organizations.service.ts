@@ -14,6 +14,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { Organization, OrganizationDocument } from './schemas/organization.schema';
 import { OrganizationMember, OrganizationMemberDocument } from './schemas/organization-member.schema';
 import { OrganizationInvitation, OrganizationInvitationDocument, InvitationStatus } from './schemas/organization-invitation.schema';
+import { Plan, PlanDocument } from '../plans/schemas/plan.schema';
 import { CreateOrganizationDto } from './dto/create-organization.dto';
 import { UpdateOrganizationDto } from './dto/update-organization.dto';
 import { InviteMemberDto } from './dto/invite-member.dto';
@@ -31,12 +32,14 @@ export class OrganizationsService {
     @InjectModel(OrganizationMember.name) private memberModel: Model<OrganizationMemberDocument>,
     @InjectModel(OrganizationInvitation.name) private invitationModel: Model<OrganizationInvitationDocument>,
     @InjectModel(User.name) private userModel: Model<UserDocument>,
+    @InjectModel(Plan.name) private planModel: Model<PlanDocument>,
     private configService: ConfigService,
     private emailService: EmailService,
     private storageService: StorageService,
   ) {}
 
   async create(userId: string, dto: CreateOrganizationDto): Promise<OrganizationDocument> {
+    await this.checkWorkspaceLimit(userId);
     const slug = dto.slug || this.generateSlug(dto.name);
     const existingSlug = await this.organizationModel.findOne({ slug });
     if (existingSlug) {
@@ -74,12 +77,46 @@ export class OrganizationsService {
   }
 
   async findAll(userId: string): Promise<OrganizationDocument[]> {
-    const memberships = await this.memberModel
+    let memberships = await this.memberModel
       .find({ userId: new Types.ObjectId(userId), status: 'ACTIVE' })
       .populate('organizationId')
       .exec();
+    // Self-heal: orgs created before membership creation existed leave the
+    // user with organizationId but no member doc, which blanks the workspace
+    // (only Settings accessible). Recreate it once.
+    if (memberships.length === 0) {
+      const user = await this.userModel.findById(userId).exec();
+      const orgId = (user as any)?.organizationId;
+      if (orgId) {
+        const existing = await this.memberModel.findOne({
+          userId: new Types.ObjectId(userId),
+          organizationId: new Types.ObjectId(orgId.toString()),
+        }).exec();
+        if (!existing) {
+          const orgExists = await this.organizationModel.findById(orgId).exec();
+          if (orgExists) {
+            await this.memberModel.create({
+              userId: new Types.ObjectId(userId),
+              organizationId: new Types.ObjectId(orgId.toString()),
+              role: (user as any).role || Role.ADMIN,
+              status: 'ACTIVE',
+              joinedAt: new Date(),
+            });
+            this.logger.log(`Healed missing membership for user ${userId} in org ${orgId}`);
+            memberships = await this.memberModel
+              .find({ userId: new Types.ObjectId(userId), status: 'ACTIVE' })
+              .populate('organizationId')
+              .exec();
+          }
+        }
+      }
+    }
 
-    return memberships.map((m) => m.organizationId as unknown as OrganizationDocument);
+    // Drop orphan memberships whose organization was deleted (populate
+    // yields null) so callers never receive null entries
+    return memberships
+      .map((m) => m.organizationId as unknown as OrganizationDocument)
+      .filter((o) => !!o && !!(o as any)._id);
   }
 
   async findById(organizationId: string): Promise<OrganizationDocument> {
@@ -182,6 +219,11 @@ export class OrganizationsService {
     await this.checkPermission(organizationId, userId, 'members:invite');
     await this.checkMemberLimit(organizationId);
 
+    // SUPER_ADMIN is platform-level and can never be granted inside an org
+    if (dto.role?.toUpperCase() === Role.SUPER_ADMIN) {
+      throw new ForbiddenException('SUPER_ADMIN role cannot be assigned within an organization');
+    }
+
     // Check if already a member
     const existingMembers = await this.memberModel.find({
       organizationId: new Types.ObjectId(organizationId),
@@ -214,10 +256,14 @@ export class OrganizationsService {
       invitedBy: new Types.ObjectId(userId),
     });
 
-    // Send invitation email
+    // Send invitation email (must never fail the invite, e.g. Redis/mail down)
     const organization = await this.findById(organizationId);
     const clientUrl = this.configService.get<string>('app.clientUrl') || 'http://localhost:5173';
-    await this.emailService.sendInvitationEmail(dto.email, organization.name, dto.role, token, clientUrl);
+    try {
+      await this.emailService.sendInvitationEmail(dto.email, organization.name, dto.role, token, clientUrl);
+    } catch (e: any) {
+      this.logger.warn(`Invitation email failed for ${dto.email}: ${e?.message || e}`);
+    }
 
     this.logger.log(`Invitation sent to ${dto.email} for organization ${organizationId}`);
     return invitation;
@@ -246,6 +292,9 @@ export class OrganizationsService {
     await this.checkMemberLimit(invitation.organizationId.toString());
 
     // Create membership
+    if (invitation.role?.toUpperCase() === Role.SUPER_ADMIN) {
+      throw new ForbiddenException('SUPER_ADMIN role cannot be assigned within an organization');
+    }
     await this.memberModel.create({
       userId: new Types.ObjectId(userId),
       organizationId: invitation.organizationId,
@@ -426,6 +475,33 @@ export class OrganizationsService {
     organization.settings = { ...organization.settings, ...settings };
     await organization.save();
     return organization.settings;
+  }
+
+  /**
+   * Enforces the plan workspace limit: a user may own (ACTIVE ADMIN member
+   * of) at most workspaceLimit organizations, where the limit comes from
+   * the plan of their current organization. No plan / no limit = unlimited.
+   */
+  private async checkWorkspaceLimit(userId: string): Promise<void> {
+    const user = await this.userModel.findById(userId).lean().exec();
+    const orgId = (user as any)?.organizationId;
+    if (!orgId) return;
+    const org = await this.organizationModel.findById(orgId).lean().exec();
+    const planSlug = (org as any)?.subscription?.plan;
+    if (!planSlug) return;
+    const plan = await this.planModel.findOne({ slug: planSlug }).lean().exec();
+    const limit = (plan as any)?.workspaceLimit;
+    if (!limit) return;
+    const owned = await this.memberModel.countDocuments({
+      userId: new Types.ObjectId(userId),
+      role: Role.ADMIN,
+      status: 'ACTIVE',
+    });
+    if (owned >= limit) {
+      throw new ForbiddenException(
+        `Workspace limit reached for your plan (max ${limit}). Upgrade your plan to create more workspaces.`,
+      );
+    }
   }
 
   /**

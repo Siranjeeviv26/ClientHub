@@ -49,6 +49,31 @@ export class BillingController {
     return this.billingService.verifyRazorpayPayment(organizationId, userId, body);
   }
 
+  // Public plan payment links (emailed by super admin, valid 2 days, no login)
+  @Public()
+  @Get('pay-link/:token')
+  @ApiOperation({ summary: 'Get payment link details (public, validates 2-day expiry)' })
+  async getPayLink(@Param('token') token: string) {
+    return this.billingService.getPayLinkDetails(token);
+  }
+
+  @Public()
+  @Post('pay-link/:token/order')
+  @ApiOperation({ summary: 'Create Razorpay order for a payment link (public)' })
+  async createPayLinkOrder(@Param('token') token: string) {
+    return this.billingService.createPayLinkOrder(token);
+  }
+
+  @Public()
+  @Post('pay-link/:token/verify')
+  @ApiOperation({ summary: 'Verify payment link payment and activate subscription (public)' })
+  async verifyPayLinkPayment(
+    @Param('token') token: string,
+    @Body() body: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string },
+  ) {
+    return this.billingService.verifyPayLinkPayment(token, body);
+  }
+
   @Get('subscription/status')
   @Permissions('organization:billing:read')
   @ApiOperation({ summary: 'Get current subscription status' })

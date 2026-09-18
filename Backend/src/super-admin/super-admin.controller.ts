@@ -3,6 +3,8 @@ import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { SuperAdminGuard } from './guards/super-admin.guard';
 import { SuperAdminService } from './super-admin.service';
+import { RolesService } from '../roles/roles.service';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { CreateOrganizationWithAdminDto } from './dto/create-organization.dto';
 import { CreatePlanDto, UpdatePlanDto } from '../plans/dto/plan.dto';
 
@@ -11,7 +13,41 @@ import { CreatePlanDto, UpdatePlanDto } from '../plans/dto/plan.dto';
 @Controller('super-admin')
 @UseGuards(JwtAuthGuard, SuperAdminGuard)
 export class SuperAdminController {
-  constructor(private readonly superAdminService: SuperAdminService) {}
+  constructor(
+    private readonly superAdminService: SuperAdminService,
+    private readonly rolesService: RolesService,
+  ) {}
+
+  // Platform roles & permissions (global templates, reflected in plans)
+  @Get('roles')
+  @ApiOperation({ summary: 'Get all platform roles with permissions' })
+  async getAllRoles() {
+    return this.rolesService.getGlobalRoles();
+  }
+
+  @Post('roles')
+  @ApiOperation({ summary: 'Create a platform role (super admin)' })
+  async createRole(
+    @CurrentUser('_id') userId: string,
+    @Body() dto: { name: string; label: string; description?: string; permissions: string[] },
+  ) {
+    return this.rolesService.createGlobalRole(dto, userId);
+  }
+
+  @Patch('roles/:name')
+  @ApiOperation({ summary: 'Update a platform role (super admin)' })
+  async updateRole(
+    @Param('name') name: string,
+    @Body() dto: { label?: string; description?: string; permissions?: string[] },
+  ) {
+    return this.rolesService.updateGlobalRole(name, dto);
+  }
+
+  @Delete('roles/:name')
+  @ApiOperation({ summary: 'Delete a custom platform role (super admin)' })
+  async deleteRole(@Param('name') name: string) {
+    return this.rolesService.deleteGlobalRole(name);
+  }
 
   // Organizations
   @Post('organizations')
@@ -141,13 +177,15 @@ export class SuperAdminController {
     return this.superAdminService.assignPlanToOrganization(planId, orgId);
   }
 
-  // Audit Logs (platform-wide)
+  // Audit Logs (platform-wide, filterable per organization)
   @Get('audit-logs')
   @ApiOperation({ summary: 'Get platform-wide audit logs' })
   @ApiQuery({ name: 'page', required: false })
   @ApiQuery({ name: 'limit', required: false })
   @ApiQuery({ name: 'action', required: false })
   @ApiQuery({ name: 'entity', required: false })
+  @ApiQuery({ name: 'organizationId', required: false })
+  @ApiQuery({ name: 'search', required: false })
   @ApiQuery({ name: 'startDate', required: false })
   @ApiQuery({ name: 'endDate', required: false })
   async getPlatformAuditLogs(
@@ -155,13 +193,28 @@ export class SuperAdminController {
     @Query('limit') limit?: number,
     @Query('action') action?: string,
     @Query('entity') entity?: string,
+    @Query('organizationId') organizationId?: string,
+    @Query('search') search?: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
-    return this.superAdminService.getPlatformAuditLogs({ page: page ? Number(page) : 1, limit: limit ? Number(limit) : 20, action, entity, startDate, endDate });
+    return this.superAdminService.getPlatformAuditLogs({ page: page ? Number(page) : 1, limit: limit ? Number(limit) : 20, action, entity, organizationId, search, startDate, endDate });
   }
 
   // Payments (platform-wide)
+  @Get('payments/plans')
+  @ApiOperation({ summary: 'Get platform-wide plan purchase history (Razorpay)' })
+  @ApiQuery({ name: 'page', required: false })
+  @ApiQuery({ name: 'limit', required: false })
+  @ApiQuery({ name: 'search', required: false })
+  async getAllPlanPayments(
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('search') search?: string,
+  ) {
+    return this.superAdminService.getAllPlanPayments({ page: page ? Number(page) : 1, limit: limit ? Number(limit) : 20, search });
+  }
+
   @Get('payments')
   @ApiOperation({ summary: 'Get all payments platform-wide' })
   @ApiQuery({ name: 'page', required: false })

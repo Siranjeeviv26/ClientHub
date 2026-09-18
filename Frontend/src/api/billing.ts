@@ -10,6 +10,15 @@ export const billingApi = {
   getRazorpayKey: () =>
     api.get('/billing/razorpay/key'),
 
+  getPayLink: (token: string) =>
+    api.get(`/billing/pay-link/${token}`),
+
+  createPayLinkOrder: (token: string) =>
+    api.post(`/billing/pay-link/${token}/order`),
+
+  verifyPayLinkPayment: (token: string, data: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) =>
+    api.post(`/billing/pay-link/${token}/verify`, data),
+
   createRazorpayOrder: (planSlug: string) =>
     api.post('/billing/razorpay/order', { planSlug }),
 

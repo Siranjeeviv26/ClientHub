@@ -7,7 +7,7 @@ import { superAdminApi } from '../../api/super-admin';
 import type { Plan } from '../../types';
 import toast from 'react-hot-toast';
 
-const ALL_ROLES = ['ADMIN', 'MANAGER', 'SALES', 'EMPLOYEE'];
+const FALLBACK_ROLES = ['ADMIN', 'MANAGER', 'SALES', 'EMPLOYEE'];
 
 interface PlanFormData {
   name: string;
@@ -15,6 +15,7 @@ interface PlanFormData {
   price: number;
   period: string;
   memberLimit: string;
+  workspaceLimit: string;
   clientLimit: string;
   leadLimit: string;
   dealLimit: string;
@@ -28,7 +29,7 @@ interface PlanFormData {
 
 const emptyForm: PlanFormData = {
   name: '', description: '', price: 0, period: '/mo',
-  memberLimit: '', clientLimit: '100', leadLimit: '500', dealLimit: '100',
+  memberLimit: '', workspaceLimit: '1', clientLimit: '100', leadLimit: '500', dealLimit: '100',
   storageLimit: '1073741824', monthlyEmailLimit: '1000',
   allowedRoles: ['ADMIN', 'EMPLOYEE'], features: '', sortOrder: 0, isActive: true,
 };
@@ -49,6 +50,8 @@ export default function PlansPage() {
   const [saving, setSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<Plan | null>(null);
   const [deleting, setDeleting] = useState(false);
+  // Dynamic role list from platform Roles & Permissions (falls back to enum)
+  const [availableRoles, setAvailableRoles] = useState<string[]>(FALLBACK_ROLES);
 
   const fetchPlans = useCallback(async () => {
     try {
@@ -58,7 +61,15 @@ export default function PlansPage() {
     finally { setLoading(false); }
   }, []);
 
-  useEffect(() => { fetchPlans(); }, [fetchPlans]);
+  const fetchRoles = useCallback(async () => {
+    try {
+      const res = await superAdminApi.getRoles() as { success: boolean; data: { value: string }[] };
+      const values = (res.data || []).map((r) => r.value).filter(Boolean);
+      if (values.length) setAvailableRoles(values);
+    } catch { /* keep fallback list */ }
+  }, []);
+
+  useEffect(() => { fetchPlans(); fetchRoles(); }, [fetchPlans, fetchRoles]);
 
   const openCreate = () => {
     setEditingPlan(null);
@@ -74,6 +85,7 @@ export default function PlansPage() {
       price: plan.price,
       period: plan.period,
       memberLimit: plan.memberLimit?.toString() || '',
+      workspaceLimit: plan.workspaceLimit?.toString() || '',
       clientLimit: plan.clientLimit?.toString() || '',
       leadLimit: plan.leadLimit?.toString() || '',
       dealLimit: plan.dealLimit?.toString() || '',
@@ -106,6 +118,7 @@ export default function PlansPage() {
       price: Number(form.price),
       period: form.period || '/mo',
       memberLimit: form.memberLimit ? Number(form.memberLimit) : undefined,
+      workspaceLimit: form.workspaceLimit ? Number(form.workspaceLimit) : undefined,
       clientLimit: Number(form.clientLimit) || 100,
       leadLimit: Number(form.leadLimit) || 500,
       dealLimit: Number(form.dealLimit) || 100,
@@ -193,6 +206,7 @@ export default function PlansPage() {
               <div className="space-y-2 text-sm flex-1">
                 <p className="text-xs text-gray-400 uppercase tracking-wider font-semibold mb-1">Limits</p>
                 <div className="flex justify-between text-gray-500"><span>Members</span><span className="text-gray-900 font-medium">{plan.memberLimit ?? 'Unlimited'}</span></div>
+                <div className="flex justify-between text-gray-500"><span>Workspaces</span><span className="text-gray-900 font-medium">{plan.workspaceLimit ?? 'Unlimited'}</span></div>
                 <div className="flex justify-between text-gray-500"><span>Clients</span><span className="text-gray-900 font-medium">{plan.clientLimit?.toLocaleString() ?? '—'}</span></div>
                 <div className="flex justify-between text-gray-500"><span>Leads</span><span className="text-gray-900 font-medium">{plan.leadLimit?.toLocaleString() ?? '—'}</span></div>
                 <div className="flex justify-between text-gray-500"><span>Deals</span><span className="text-gray-900 font-medium">{plan.dealLimit?.toLocaleString() ?? '—'}</span></div>
@@ -282,6 +296,11 @@ export default function PlansPage() {
                       className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500" />
                   </div>
                   <div>
+                    <label className="block text-xs text-gray-500 mb-1">Workspaces</label>
+                    <input type="number" value={form.workspaceLimit} onChange={(e) => setForm({ ...form, workspaceLimit: e.target.value })} placeholder="Unlimited" min={0}
+                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500" />
+                  </div>
+                  <div>
                     <label className="block text-xs text-gray-500 mb-1">Clients</label>
                     <input type="number" value={form.clientLimit} onChange={(e) => setForm({ ...form, clientLimit: e.target.value })} min={0}
                       className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500" />
@@ -313,7 +332,7 @@ export default function PlansPage() {
                 <p className="text-sm font-medium text-gray-700 mb-2">Allowed Roles</p>
                 <p className="text-xs text-gray-500 mb-3">Select which roles organizations on this plan can assign to their members</p>
                 <div className="grid grid-cols-2 gap-2">
-                  {ALL_ROLES.map((role) => {
+                  {availableRoles.map((role) => {
                     const selected = form.allowedRoles.includes(role);
                     return (
                       <button key={role} type="button" onClick={() => toggleRole(role)}

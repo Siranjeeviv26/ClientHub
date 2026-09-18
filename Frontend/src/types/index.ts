@@ -508,6 +508,7 @@ export interface Plan {
   price: number;
   period: string;
   memberLimit?: number;
+  workspaceLimit?: number;
   clientLimit: number;
   leadLimit: number;
   dealLimit: number;

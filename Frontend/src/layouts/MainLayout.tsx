@@ -463,7 +463,7 @@ export function MainLayout() {
 
                 {orgSwitcherOpen && (
                   <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg border border-gray-200 shadow-lg py-1 z-50">
-                    {organizations.map((org) => (
+                    {(organizations || []).filter((org: any) => org && org._id).map((org) => (
                       <button
                         key={org._id}
                         onClick={() => handleOrgSwitch(org._id)}
