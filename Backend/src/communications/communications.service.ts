@@ -13,6 +13,11 @@ function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+const ALLOWED_SORT_FIELDS = [
+  'createdAt', 'updatedAt', 'type', 'direction', 'subject', 'status',
+  'userId', 'clientId', 'leadId', 'dealId',
+];
+
 @Injectable()
 export class CommunicationsService {
   private readonly logger = new Logger(CommunicationsService.name);
@@ -113,7 +118,8 @@ export class CommunicationsService {
     let sort: any = { createdAt: -1 };
     if (query.sort) {
       const sortParts = query.sort.split(':');
-      sort = { [sortParts[0]]: sortParts[1] === 'asc' ? 1 : -1 };
+      const sortField = ALLOWED_SORT_FIELDS.includes(sortParts[0]) ? sortParts[0] : 'createdAt';
+      sort = { [sortField]: sortParts[1] === 'asc' ? 1 : -1 };
     }
 
     const [items, total] = await Promise.all([

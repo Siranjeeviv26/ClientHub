@@ -284,7 +284,11 @@ export default function SubscriptionPage() {
         fetchData();
         return;
       }
-      const razorpayKey = order.key || (await billingApi.getRazorpayKey() as any)?.data?.key || 'rzp_test_TcyE5iXeV4CAqG';
+      const razorpayKey = order.key || (await billingApi.getRazorpayKey() as any)?.data?.key;
+      if (!razorpayKey) {
+        toast.error("Payment key not configured");
+        return;
+      }
       await openRazorpayCheckout({
         key: razorpayKey,
         amount: order.amount,
@@ -376,7 +380,11 @@ export default function SubscriptionPage() {
         fetchData();
         return;
       }
-      const razorpayKey = order.key || (await billingApi.getRazorpayKey() as any)?.data?.key || 'rzp_test_TcyE5iXeV4CAqG';
+      const razorpayKey = order.key || (await billingApi.getRazorpayKey() as any)?.data?.key;
+      if (!razorpayKey) {
+        toast.error("Payment key not configured");
+        return;
+      }
       await openRazorpayCheckout({ key: razorpayKey, amount: order.amount, currency: order.currency || 'INR', orderId: order.orderId, planSlug, planName: targetPlan?.name || planSlug });
     } catch (e: any) {
       toast.error(e.response?.data?.message || e.message || "Failed to upgrade");

@@ -9,7 +9,10 @@ import {
   Headers,
   HttpCode,
   HttpStatus,
+  UnauthorizedException,
+  Res,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 
@@ -23,6 +26,7 @@ import { ChangePasswordDto } from './dto/change-password.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { Public } from '../common/decorators/public.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { setAuthCookies, clearAuthCookies } from './auth.cookies';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -54,41 +58,55 @@ export class AuthController {
     @Body() dto: LoginDto,
     @Ip() ip: string,
     @Headers('user-agent') userAgent: string,
+    @Res({ passthrough: true }) res: Response,
   ) {
-    return this.authService.login(dto, ip, userAgent);
+    const tokens = await this.authService.login(dto, ip, userAgent);
+    setAuthCookies(res, tokens);
+    return tokens;
   }
 
   @Post('logout')
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth('access-token')
-  @ApiOperation({ summary: 'Logout - revokes refresh token' })
+  @ApiOperation({ summary: 'Logout - revokes refresh token for the user' })
   @ApiResponse({ status: 200, description: 'Logged out successfully' })
   async logout(
-    @CurrentUser('refreshToken') refreshToken: string,
     @CurrentUser('_id') userId: string,
+    @Res({ passthrough: true }) res: Response,
+    @Body('refreshToken') refreshToken?: string,
   ) {
-    if (refreshToken) {
-      await this.authService.logout(userId, refreshToken);
+    const cookieRefresh = (res.req as any)?.cookies?.refreshToken;
+    const token = refreshToken || cookieRefresh;
+    if (token) {
+      await this.authService.logout(userId, token);
+    } else {
+      await this.authService.revokeAllUserTokensForLogout(userId);
     }
+    clearAuthCookies(res);
     return { message: 'Logged out successfully' };
   }
 
   @Post('refresh')
   @Public()
   @Throttle({ default: { limit: 20, ttl: 60000 } }) // 20 requests per minute
-  @ApiOperation({ summary: 'Refresh access token using refresh token' })
+  @ApiOperation({ summary: 'Refresh access token using refresh token (cookie or body)' })
   @ApiResponse({ status: 200, description: 'New tokens generated' })
   @ApiResponse({ status: 401, description: 'Invalid or expired refresh token' })
   async refresh(
-    @Body('refreshToken') refreshToken: string,
+    @Body('refreshToken') refreshToken: string | undefined,
     @Ip() ip: string,
     @Headers('user-agent') userAgent: string,
+    @Res({ passthrough: true }) res: Response,
   ) {
-    if (!refreshToken) {
+    const cookieRefresh = (res.req as any)?.cookies?.refreshToken;
+    const token = refreshToken || cookieRefresh;
+    if (!token) {
       throw new UnauthorizedException('Refresh token required');
     }
-    return this.authService.refreshTokens(refreshToken, ip, userAgent);
+    const tokens = await this.authService.refreshTokens(token, ip, userAgent);
+    setAuthCookies(res, tokens);
+    return tokens;
   }
 
   @Post('verify-email')
@@ -159,10 +177,10 @@ export class AuthController {
   async switchOrganization(
     @CurrentUser('_id') userId: string,
     @Body('organizationId') organizationId: string,
+    @Res({ passthrough: true }) res: Response,
   ) {
-    return this.authService.switchOrganization(userId, organizationId);
+    const tokens = await this.authService.switchOrganization(userId, organizationId);
+    setAuthCookies(res, tokens);
+    return tokens;
   }
 }
-
-// Need to import UnauthorizedException
-import { UnauthorizedException } from '@nestjs/common';

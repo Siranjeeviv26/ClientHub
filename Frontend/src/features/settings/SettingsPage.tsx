@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import {
   User,
@@ -92,7 +92,7 @@ type ProfileForm = z.infer<typeof profileSchema>;
 type PasswordForm = z.infer<typeof passwordSchema>;
 type OrganizationForm = z.infer<typeof organizationSchema>;
 
-const TIMEZONES = [
+const FALLBACK_TIMEZONES = [
   "America/New_York",
   "America/Chicago",
   "America/Denver",
@@ -105,8 +105,87 @@ const TIMEZONES = [
   "UTC",
 ];
 const DATE_FORMATS = ["MM/DD/YYYY", "DD/MM/YYYY", "YYYY-MM-DD"];
-const CURRENCIES = ["USD", "EUR", "GBP", "CAD", "AUD", "JPY"];
-const LANGUAGES = ["en", "es", "fr", "de", "zh", "ja"];
+const FALLBACK_CURRENCIES = ["USD", "EUR", "GBP", "CAD", "AUD", "JPY"];
+
+type SelectOption = { value: string; label: string };
+
+const getTimezoneLabel = (tz: string): string => {
+  try {
+    const parts = new Intl.DateTimeFormat("en", { timeZone: tz, timeZoneName: "shortOffset" }).formatToParts(new Date());
+    const offset = parts.find((p) => p.type === "timeZoneName")?.value;
+    return offset ? `${tz} (${offset})` : tz;
+  } catch {
+    return tz;
+  }
+};
+
+const buildTimezoneOptions = (): SelectOption[] => {
+  let zones: string[] = FALLBACK_TIMEZONES;
+  try {
+    const supported = (Intl as any).supportedValuesOf?.("timeZone") as string[] | undefined;
+    if (supported && supported.length > 0) zones = supported.includes("UTC") ? supported : [...supported, "UTC"];
+  } catch {
+    /* browser without supportedValuesOf — keep fallback */
+  }
+  return zones.map((tz) => ({ value: tz, label: getTimezoneLabel(tz) }));
+};
+
+const getDisplayNames = (type: "currency" | "language"): Intl.DisplayNames | null => {
+  try {
+    return new Intl.DisplayNames([typeof navigator !== "undefined" ? navigator.language || "en" : "en"], { type });
+  } catch {
+    return null;
+  }
+};
+
+const buildCurrencyOptions = (): SelectOption[] => {
+  let codes: string[] = FALLBACK_CURRENCIES;
+  try {
+    const supported = (Intl as any).supportedValuesOf?.("currency") as string[] | undefined;
+    if (supported && supported.length > 0) codes = supported;
+  } catch {
+    /* keep fallback */
+  }
+  const names = getDisplayNames("currency");
+  return codes.map((code) => {
+    let name = "";
+    try {
+      name = names?.of(code) || "";
+    } catch {
+      name = "";
+    }
+    return { value: code, label: name && name !== code ? `${code} — ${name}` : code };
+  });
+};
+
+// Browsers cannot enumerate languages, so codes are the standard ISO 639-1 set;
+// display names are resolved dynamically via Intl and adapt to the browser locale.
+const LANGUAGE_CODES = [
+  "ab","aa","af","ak","sq","am","ar","an","hy","as","av","ay","az","bm","ba","eu","be","bn","bi","bs","br","bg","my",
+  "ca","ch","ce","ny","zh","cv","kw","co","cr","hr","cs","da","dv","nl","dz","en","eo","et","ee","fo","fj","fi","fr",
+  "ff","gl","ka","de","el","gn","gu","ht","ha","he","hz","hi","ho","hu","ia","id","ie","ga","ig","io","is","it","iu",
+  "ja","jv","kl","kn","kr","ks","kk","km","ki","rw","ky","kv","kg","ko","kj","ku","lo","la","lv","li","ln","lt","lu",
+  "lg","mk","mg","ms","ml","mt","mi","mr","mh","mn","na","nv","nb","ne","ng","nn","no","ii","oc","oj","om","or","os",
+  "pa","pi","fa","pl","ps","pt","qu","rm","rn","ro","ru","sm","sg","sc","sr","sn","si","sk","sl","so","st","es","su",
+  "sw","sv","ty","tg","ta","te","th","ti","bo","tk","tl","tn","to","tr","ts","tt","tw","ug","uk","ur","uz","ve","vi",
+  "vo","wa","cy","wo","fy","xh","yi","yo","za","zu",
+];
+
+const buildLanguageOptions = (): SelectOption[] => {
+  const names = getDisplayNames("language");
+  const codes = LANGUAGE_CODES.includes(typeof navigator !== "undefined" && navigator.language ? navigator.language.slice(0, 2) : "en")
+    ? LANGUAGE_CODES
+    : [typeof navigator !== "undefined" ? navigator.language.slice(0, 2) : "en", ...LANGUAGE_CODES];
+  return codes.map((code) => {
+    let name = "";
+    try {
+      name = names?.of(code) || "";
+    } catch {
+      name = "";
+    }
+    return { value: code, label: name && name !== code ? `${name} (${code})` : code.toUpperCase() };
+  });
+};
 
 type TabId =
   | "profile"
@@ -144,6 +223,107 @@ function ToggleSwitch({ checked, onChange }: { checked: boolean; onChange: (v: b
       <input type="checkbox" checked={checked} className="peer sr-only" onChange={(e) => onChange(e.target.checked)} />
       <span className="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out peer-checked:translate-x-5" />
     </span>
+  );
+}
+
+function SearchableSelect({
+  options,
+  value,
+  onChange,
+  placeholder = "Search...",
+}: {
+  options: SelectOption[];
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const selectedLabel = options.find((o) => o.value === value)?.label || value;
+
+  useEffect(() => {
+    if (!open) return;
+    const onMouseDown = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onMouseDown);
+    document.addEventListener("keydown", onKeyDown);
+    const t = setTimeout(() => inputRef.current?.focus(), 0);
+    return () => {
+      document.removeEventListener("mousedown", onMouseDown);
+      document.removeEventListener("keydown", onKeyDown);
+      clearTimeout(t);
+    };
+  }, [open]);
+
+  const normalized = query.trim().toLowerCase();
+  const filtered = normalized
+    ? options.filter((o) => o.label.toLowerCase().includes(normalized) || o.value.toLowerCase().includes(normalized))
+    : options;
+  const visible = filtered.slice(0, 200);
+
+  return (
+    <div ref={containerRef} className="relative">
+      <button
+        type="button"
+        onClick={() => {
+          setOpen((o) => !o);
+          setQuery("");
+        }}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-left flex items-center justify-between gap-2 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all"
+      >
+        <span className={`truncate ${value ? "text-gray-900" : "text-gray-400"}`}>{value ? selectedLabel : placeholder}</span>
+        <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {open && (
+        <div className="absolute z-30 mt-1 w-full rounded-xl border border-gray-200 bg-white shadow-lg overflow-hidden">
+          <div className="p-2 border-b border-gray-100">
+            <input
+              ref={inputRef}
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={placeholder}
+              className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm placeholder:text-gray-400 focus:bg-white focus:border-gray-400 focus:outline-none"
+            />
+          </div>
+          <ul className="max-h-60 overflow-y-auto py-1" role="listbox">
+            {visible.length === 0 && <li className="px-3 py-2 text-sm text-gray-400">No matches</li>}
+            {visible.map((o) => (
+              <li key={o.value} role="option" aria-selected={o.value === value}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onChange(o.value);
+                    setOpen(false);
+                  }}
+                  className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 flex items-center justify-between gap-2 ${
+                    o.value === value ? "bg-primary-50 text-primary-700 font-medium" : "text-gray-700"
+                  }`}
+                >
+                  <span className="truncate">{o.label}</span>
+                  {o.value === value && (
+                    <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  )}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -193,6 +373,7 @@ export function SettingsPage() {
   const [orgSettings, setOrgSettings] = useState<any>(null);
   // Admin-only extended org settings (from OrganizationSettings)
   const [company, setCompany] = useState({ name: '', logo: '', website: '', phone: '', email: '', address: '' });
+  const logoInputRef = useRef<HTMLInputElement>(null);
   const [invoice, setInvoice] = useState({ prefix: 'INV', nextNumber: 1001, defaultTaxRate: 0, paymentTerms: 30 });
   const [security, setSecurity] = useState({ passwordMinLength: 8, requireUppercase: true, requireNumbers: true, sessionTimeout: 60 });
   const isAdmin = user?.role === 'ADMIN';
@@ -232,6 +413,7 @@ export function SettingsPage() {
     handleSubmit: handleSubmitOrg,
     setValue: setOrgValue,
     watch: watchOrg,
+    reset: resetOrg,
     formState: { errors: orgErrors },
   } = useForm<OrganizationForm>({
     resolver: zodResolver(organizationSchema),
@@ -266,14 +448,24 @@ export function SettingsPage() {
     if (organization) {
       loadMembers();
       loadOrgSettings();
+      // Populate workspace form from saved org data
+      resetOrg({
+        name: organization.name || "",
+        slug: organization.slug || "",
+        timezone: organization.settings?.timezone || "America/New_York",
+        dateFormat: organization.settings?.dateFormat || "MM/DD/YYYY",
+        currency: organization.settings?.currency || "USD",
+        language: organization.settings?.language || "en",
+      });
       // Populate extended admin fields
+      const savedCompany = (organization.settings as any)?.company || {};
       setCompany({
         name: organization.name || '',
         logo: (organization as any).logo || '',
-        website: (organization as any).website || '',
-        phone: (organization as any).phone || '',
-        email: (organization as any).email || '',
-        address: (organization as any).address || '',
+        website: savedCompany.website || (organization as any).website || '',
+        phone: savedCompany.phone || (organization as any).phone || '',
+        email: savedCompany.email || (organization as any).email || '',
+        address: savedCompany.address || (organization as any).address || '',
       });
       setInvoice({
         prefix: organization.settings?.invoice?.prefix || 'INV',
@@ -289,6 +481,10 @@ export function SettingsPage() {
       });
     }
   }, [organization]);
+
+  const timezoneOptions = React.useMemo(() => buildTimezoneOptions(), []);
+  const currencyOptions = React.useMemo(() => buildCurrencyOptions(), []);
+  const languageOptions = React.useMemo(() => buildLanguageOptions(), []);
 
   const loadMembers = async () => {
     if (!organization) return;
@@ -353,7 +549,16 @@ export function SettingsPage() {
     if (!organization) return;
     setSaving(true);
     try {
-      const response = await organizationsApi.update(organization._id, data);
+      const response = await organizationsApi.update(organization._id, {
+        name: data.name,
+        slug: data.slug,
+        settings: {
+          timezone: data.timezone,
+          dateFormat: data.dateFormat,
+          currency: data.currency,
+          language: data.language,
+        },
+      });
       if (response.success) {
         toast.success("Workspace updated");
         loadOrganizations();
@@ -441,10 +646,12 @@ export function SettingsPage() {
     if (!organization) return;
     setSaving(true);
     try {
-      const res = await organizationsApi.update(organization._id, { name: company.name } as any);
-      if (res.success) { toast.success('Company settings saved'); loadOrganizations(); }
-      // Also save extra fields via settings if needed
-      await organizationsApi.updateSettings(organization._id, { company } as any);
+      const res = await organizationsApi.update(organization._id, { name: company.name });
+      const settingsRes = await organizationsApi.updateSettings(organization._id, { company });
+      if (res.success && settingsRes.success) {
+        toast.success('Company settings saved');
+        loadOrganizations();
+      }
     } catch (e: any) { toast.error(e.response?.data?.message || 'Failed to save'); }
     finally { setSaving(false); }
   };
@@ -481,6 +688,29 @@ export function SettingsPage() {
       }
     } catch (error: any) {
       toast.error(error.response?.data?.message || "Failed to upload avatar");
+    }
+  };
+
+  const handleLogoUpload = async (file: File) => {
+    if (!organization) return;
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("Logo must be 2MB or smaller");
+      return;
+    }
+    const allowed = ["image/png", "image/jpeg", "image/webp", "image/svg+xml"];
+    if (!allowed.includes(file.type)) {
+      toast.error("Logo must be PNG, JPG, WebP, or SVG");
+      return;
+    }
+    try {
+      const res = await organizationsApi.uploadLogo(organization._id, file);
+      if (res.success && res.data?.logo) {
+        setCompany((c) => ({ ...c, logo: res.data.logo }));
+        toast.success("Logo uploaded");
+        loadOrganizations();
+      }
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Failed to upload logo");
     }
   };
 
@@ -963,7 +1193,7 @@ export function SettingsPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
                       <div className="space-y-1.5">
                         <label className="text-xs font-medium tracking-wide uppercase text-gray-500 flex items-center gap-1"><Clock3 className="w-3 h-3" /> Timezone</label>
-                        <Select options={TIMEZONES.map(t => ({ value: t, label: t }))} value={watchOrg('timezone')} onChange={(e) => setOrgValue('timezone', e.target.value)} />
+                        <SearchableSelect options={timezoneOptions} value={watchOrg('timezone') || ''} onChange={(v) => setOrgValue('timezone', v)} placeholder="Search timezones..." />
                       </div>
                       <div className="space-y-1.5">
                         <label className="text-xs font-medium tracking-wide uppercase text-gray-500">Date format</label>
@@ -971,11 +1201,11 @@ export function SettingsPage() {
                       </div>
                       <div className="space-y-1.5">
                         <label className="text-xs font-medium tracking-wide uppercase text-gray-500 flex items-center gap-1"><DollarSign className="w-3 h-3" /> Currency</label>
-                        <Select options={CURRENCIES.map(c => ({ value: c, label: c }))} value={watchOrg('currency')} onChange={(e) => setOrgValue('currency', e.target.value)} />
+                        <SearchableSelect options={currencyOptions} value={watchOrg('currency') || ''} onChange={(v) => setOrgValue('currency', v)} placeholder="Search currencies..." />
                       </div>
                       <div className="space-y-1.5">
                         <label className="text-xs font-medium tracking-wide uppercase text-gray-500 flex items-center gap-1"><Languages className="w-3 h-3" /> Language</label>
-                        <Select options={LANGUAGES.map(l => ({ value: l, label: l.toUpperCase() }))} value={watchOrg('language')} onChange={(e) => setOrgValue('language', e.target.value)} />
+                        <SearchableSelect options={languageOptions} value={watchOrg('language') || ''} onChange={(v) => setOrgValue('language', v)} placeholder="Search languages..." />
                       </div>
                     </div>
                   </div>
@@ -997,13 +1227,31 @@ export function SettingsPage() {
                     <div className="space-y-6">
                       <div className="flex items-center gap-5">
                         <div className="w-20 h-20 rounded-2xl bg-gray-50 border-2 border-dashed border-gray-200 flex items-center justify-center overflow-hidden">
-                          {company.logo ? <img src={company.logo} alt="Logo" className="w-full h-full object-cover" /> : <Upload className="w-6 h-6 text-gray-300" />}
+                          {company.logo ? <img src={company.logo} alt="Logo" className="w-full h-full object-contain" /> : <Upload className="w-6 h-6 text-gray-300" />}
                         </div>
                         <div>
                           <p className="text-sm font-medium text-gray-900">Organization Logo</p>
                           <p className="text-xs text-gray-500 mt-0.5">PNG, JPG up to 2MB. Square recommended.</p>
                           <div className="flex gap-2 mt-2">
-                            <Button variant="outline" size="sm" leftIcon={<Upload className="w-3.5 h-3.5" />}>Upload</Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              leftIcon={<Upload className="w-3.5 h-3.5" />}
+                              onClick={() => logoInputRef.current?.click()}
+                            >
+                              Upload
+                            </Button>
+                            <input
+                              ref={logoInputRef}
+                              type="file"
+                              accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                              className="hidden"
+                              onChange={(e) => {
+                                const f = e.target.files?.[0];
+                                if (f) handleLogoUpload(f);
+                                e.target.value = "";
+                              }}
+                            />
                             {company.logo && <Button variant="ghost" size="sm" onClick={() => setCompany({ ...company, logo: '' })} className="text-gray-400 hover:text-red-600"><X className="w-3.5 h-3.5" /></Button>}
                           </div>
                         </div>

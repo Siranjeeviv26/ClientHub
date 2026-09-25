@@ -8,8 +8,8 @@ export default registerAs('app', () => ({
     uri: process.env.MONGODB_URI || 'mongodb://localhost:27017/clienthub',
   },
   jwt: {
-    accessSecret: process.env.JWT_ACCESS_SECRET || 'dev-access-secret-change-in-production',
-    refreshSecret: process.env.JWT_REFRESH_SECRET || 'dev-refresh-secret-change-in-production',
+    accessSecret: process.env.JWT_ACCESS_SECRET || '',
+    refreshSecret: process.env.JWT_REFRESH_SECRET || '',
     accessExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN || '15m',
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
   },
@@ -31,8 +31,8 @@ export default registerAs('app', () => ({
     limit: parseInt(process.env.THROTTLE_LIMIT || '100', 10),
   },
   razorpay: {
-    keyId: process.env.RAZORPAY_KEY_ID || 'rzp_test_TcyE5iXeV4CAqG',
-    keySecret: process.env.RAZORPAY_KEY_SECRET || 'D0rGM1Nhv5IRRaDaTkNnGFOP',
+    keyId: process.env.RAZORPAY_KEY_ID || '',
+    keySecret: process.env.RAZORPAY_KEY_SECRET || '',
     webhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET || '',
   },
   paymentProvider: process.env.PAYMENT_PROVIDER || 'razorpay',

@@ -19,12 +19,12 @@ export class BillingController {
     private readonly configService: ConfigService,
   ) {}
 
-  @Public()
   @Get('razorpay/key')
-  @ApiOperation({ summary: 'Get Razorpay public key for checkout' })
+  @Permissions('organization:billing:read')
+  @ApiOperation({ summary: 'Get Razorpay public key for checkout (authenticated)' })
   async getRazorpayKey() {
     return {
-      key: this.configService.get<string>('RAZORPAY_KEY_ID') || this.configService.get<string>('app.razorpay.keyId') || 'rzp_test_TcyE5iXeV4CAqG',
+      key: this.configService.get<string>('RAZORPAY_KEY_ID') || this.configService.get<string>('app.razorpay.keyId') || '',
     };
   }
 

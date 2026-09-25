@@ -98,25 +98,43 @@ export class RazorpayProvider implements PaymentProvider {
 
   async verifyPaymentSignature(params: { orderId: string; paymentId: string; signature: string }): Promise<boolean> {
     const crypto = require('crypto');
-    const keySecret = this.configService.get<string>('RAZORPAY_KEY_SECRET') || this.configService.get<string>('app.razorpay.keySecret') || '';
+    const keySecret =
+      this.configService.get<string>('RAZORPAY_KEY_SECRET') ||
+      this.configService.get<string>('app.razorpay.keySecret') ||
+      '';
+    // Fail closed if secret missing — otherwise HMAC with empty key accepts forged signatures
+    if (!keySecret || !params.signature) {
+      return false;
+    }
     const body = `${params.orderId}|${params.paymentId}`;
     const expected = crypto.createHmac('sha256', keySecret).update(body).digest('hex');
-    return expected === params.signature;
+    const a = Buffer.from(expected, 'utf8');
+    const b = Buffer.from(params.signature || '', 'utf8');
+    if (a.length !== b.length) return false;
+    return crypto.timingSafeEqual(a, b);
   }
 
   async verifyWebhookSignature(params: { payload: Buffer | string; signature: string; secret: string }): Promise<any> {
-    if (!this.razorpay) {
-      return JSON.parse(params.payload.toString());
-    }
     const crypto = require('crypto');
+    if (!params.secret) {
+      throw new Error('Webhook secret not configured');
+    }
+    if (!params.signature) {
+      throw new Error('Missing webhook signature');
+    }
+    const payloadBuf = Buffer.isBuffer(params.payload)
+      ? params.payload
+      : Buffer.from(params.payload);
     const expectedSignature = crypto
       .createHmac('sha256', params.secret)
-      .update(params.payload)
+      .update(payloadBuf)
       .digest('hex');
-    if (expectedSignature !== params.signature) {
+    const a = Buffer.from(expectedSignature, 'utf8');
+    const b = Buffer.from(params.signature, 'utf8');
+    if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
       throw new Error('Invalid webhook signature');
     }
-    return JSON.parse(params.payload.toString());
+    return JSON.parse(payloadBuf.toString());
   }
 
   async getSubscriptionStatus(params: { subscriptionId: string }): Promise<{ status: string; currentPeriodEnd?: Date }> {

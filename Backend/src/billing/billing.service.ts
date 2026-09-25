@@ -110,7 +110,7 @@ export class BillingService {
       orderId: order.id,
       amount: order.amount,
       currency: order.currency,
-      key: this.configService.get<string>('RAZORPAY_KEY_ID') || this.configService.get<string>('app.razorpay.keyId') || 'rzp_test_TcyE5iXeV4CAqG',
+      key: this.configService.get<string>('RAZORPAY_KEY_ID') || this.configService.get<string>('app.razorpay.keyId') || '',
       plan: { name: plan.name, price: plan.price },
     };
   }
@@ -230,7 +230,7 @@ export class BillingService {
     const link = await this.getValidPayLink(token);
     const org = await this.organizationModel.findById(link.organizationId).lean().exec();
     const plan = await this.plansService.findBySlug(link.planSlug);
-    const key = this.configService.get<string>('RAZORPAY_KEY_ID') || this.configService.get<string>('app.razorpay.keyId') || 'rzp_test_TcyE5iXeV4CAqG';
+    const key = this.configService.get<string>('RAZORPAY_KEY_ID') || this.configService.get<string>('app.razorpay.keyId') || '';
     return {
       token: link.token,
       organizationName: (org as any)?.name || 'Your organization',
@@ -247,7 +247,7 @@ export class BillingService {
     const link = await this.getValidPayLink(token);
     const provider = this.getProvider('razorpay') as any;
     if (link.amount <= 0) {
-      return { orderId: `order_free_${Date.now()}`, amount: 0, currency: link.currency, key: this.configService.get<string>('RAZORPAY_KEY_ID') || this.configService.get<string>('app.razorpay.keyId') || 'rzp_test_TcyE5iXeV4CAqG' };
+      return { orderId: `order_free_${Date.now()}`, amount: 0, currency: link.currency, key: this.configService.get<string>('RAZORPAY_KEY_ID') || this.configService.get<string>('app.razorpay.keyId') || '' };
     }
     const order = await provider.createOrder({
       amount: link.amount,
@@ -261,7 +261,7 @@ export class BillingService {
       orderId: order.id,
       amount: order.amount,
       currency: order.currency,
-      key: this.configService.get<string>('RAZORPAY_KEY_ID') || this.configService.get<string>('app.razorpay.keyId') || 'rzp_test_TcyE5iXeV4CAqG',
+      key: this.configService.get<string>('RAZORPAY_KEY_ID') || this.configService.get<string>('app.razorpay.keyId') || '',
     };
   }
 
@@ -546,13 +546,35 @@ export class BillingService {
   }
 
   async handleWebhook(providerName: string, payload: any, signature: string): Promise<void> {
+    if (!signature) {
+      throw new BadRequestException('Missing webhook signature');
+    }
+
+    const secretEnv = providerName === 'stripe' ? 'STRIPE_WEBHOOK_SECRET' : 'RAZORPAY_WEBHOOK_SECRET';
+    const secret =
+      providerName === 'stripe'
+        ? this.configService.get<string>('STRIPE_WEBHOOK_SECRET') || ''
+        : this.configService.get<string>('RAZORPAY_WEBHOOK_SECRET') ||
+          this.configService.get<string>('app.razorpay.webhookSecret') ||
+          '';
+
+    // Fail closed — never verify with empty secret (would accept any signature)
+    if (!secret) {
+      this.logger.error(`Webhook rejected: ${secretEnv} not configured`);
+      throw new BadRequestException('Webhook secret not configured');
+    }
+
     const provider = this.getProvider(providerName);
-    const secret = this.configService.get<string>(
-      providerName === 'stripe' ? 'STRIPE_WEBHOOK_SECRET' : 'RAZORPAY_WEBHOOK_SECRET',
-    ) || '';
+
+    // Prefer raw body for signature verification (HMAC over exact bytes)
+    const rawBody: Buffer | undefined = (payload as any)?.rawBody
+      ? Buffer.from(payload.rawBody)
+      : typeof payload === 'string'
+        ? Buffer.from(payload)
+        : Buffer.from(JSON.stringify(payload));
 
     const event = await provider.verifyWebhookSignature({
-      payload: typeof payload === 'string' ? Buffer.from(payload) : payload,
+      payload: rawBody,
       signature,
       secret,
     });

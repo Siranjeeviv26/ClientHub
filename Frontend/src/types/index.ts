@@ -61,6 +61,13 @@ export interface OrganizationSettings {
     requireNumbers?: boolean;
     sessionTimeout?: number;
   };
+  company?: {
+    website?: string;
+    phone?: string;
+    email?: string;
+    address?: string;
+    logo?: string;
+  };
 }
 
 export type SubscriptionStatus = 'trialing' | 'active' | 'past_due' | 'cancelled' | 'expired' | 'suspended';
@@ -404,10 +411,32 @@ export interface InviteMemberDto {
 export interface UpdateOrganizationDto {
   name?: string;
   slug?: string;
-  timezone?: string;
-  dateFormat?: string;
-  currency?: string;
-  language?: string;
+  maxMembers?: number;
+  settings?: {
+    timezone?: string;
+    dateFormat?: string;
+    currency?: string;
+    language?: string;
+    invoice?: {
+      prefix?: string;
+      nextNumber?: number;
+      defaultTaxRate?: number;
+      paymentTerms?: number;
+    };
+    security?: {
+      passwordMinLength?: number;
+      requireUppercase?: boolean;
+      requireNumbers?: boolean;
+      sessionTimeout?: number;
+    };
+    company?: {
+      website?: string;
+      phone?: string;
+      email?: string;
+      address?: string;
+      logo?: string;
+    };
+  };
 }
 
 // Phase 3 Types

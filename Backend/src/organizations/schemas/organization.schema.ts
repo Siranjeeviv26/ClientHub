@@ -49,6 +49,13 @@ export class Organization extends BaseDocument {
       requireNumbers?: boolean;
       sessionTimeout?: number;
     };
+    company?: {
+      website?: string;
+      phone?: string;
+      email?: string;
+      address?: string;
+      logo?: string;
+    };
   };
 
   @Prop({ type: Object, default: {} })

@@ -1,4 +1,4 @@
-import { Controller, Post, Req, Res, HttpCode, Logger } from '@nestjs/common';
+import { Controller, Post, Req, Res, HttpCode, Logger, BadRequestException } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { Request, Response } from 'express';
 import { BillingService } from '../billing.service';
@@ -14,13 +14,18 @@ export class WebhookController {
   @HttpCode(200)
   @ApiOperation({ summary: 'Stripe webhook handler' })
   async handleStripeWebhook(@Req() req: Request, @Res() res: Response) {
+    const signature = req.headers['stripe-signature'] as string;
+    if (!signature) {
+      return res.status(400).json({ error: 'Missing stripe-signature header' });
+    }
     try {
-      const signature = req.headers['stripe-signature'] as string;
-      await this.billingService.handleWebhook('stripe', req.body, signature);
+      // Pass raw body when available for accurate HMAC verification
+      const payload = (req as any).rawBody ?? req.body;
+      await this.billingService.handleWebhook('stripe', payload, signature);
       res.json({ received: true });
     } catch (error) {
       this.logger.error(`Stripe webhook error: ${error.message}`);
-      res.status(400).json({ error: error.message });
+      res.status(400).json({ error: 'Webhook verification failed' });
     }
   }
 
@@ -28,13 +33,17 @@ export class WebhookController {
   @HttpCode(200)
   @ApiOperation({ summary: 'Razorpay webhook handler' })
   async handleRazorpayWebhook(@Req() req: Request, @Res() res: Response) {
+    const signature = req.headers['x-razorpay-signature'] as string;
+    if (!signature) {
+      return res.status(400).json({ error: 'Missing x-razorpay-signature header' });
+    }
     try {
-      const signature = req.headers['x-razorpay-signature'] as string;
-      await this.billingService.handleWebhook('razorpay', req.body, signature);
+      const payload = (req as any).rawBody ?? req.body;
+      await this.billingService.handleWebhook('razorpay', payload, signature);
       res.json({ received: true });
     } catch (error) {
       this.logger.error(`Razorpay webhook error: ${error.message}`);
-      res.status(400).json({ error: error.message });
+      res.status(400).json({ error: 'Webhook verification failed' });
     }
   }
 }

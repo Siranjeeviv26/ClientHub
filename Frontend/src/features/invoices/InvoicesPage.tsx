@@ -16,6 +16,8 @@ import {
   Send,
   Eye,
   CheckCircle2,
+  Download,
+  Printer,
 } from 'lucide-react';
 import { Column, Table } from '../../components/ui/Table';
 import { Modal } from '../../components/ui/Modal';
@@ -29,6 +31,7 @@ import { formatDate, formatCurrency } from '../../utils/formatters';
 import { clientsApi } from '../../api/clients';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../contexts/AuthContext';
+import { useOrganization } from '../../contexts/OrganizationContext';
 
 interface InvoiceForm {
   clientId: string;
@@ -102,6 +105,48 @@ function DaysUntilDue({ dueAt, status }: { dueAt: string; status: string }) {
   return <span className="text-xs text-gray-500">Due in {diff}d</span>;
 }
 
+const INVOICE_CSS = `
+  @page { margin: 18mm; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; color: #111827; margin: 0; background: #fff; }
+  .invoice-doc { font-family: 'Segoe UI', Arial, sans-serif; color: #111827; margin: 40px auto; max-width: 800px; padding: 0 24px; background: #fff; }
+  .head { display: flex; justify-content: space-between; align-items: flex-start; gap: 32px; border-bottom: 3px solid #111827; padding-bottom: 18px; }
+  .head-left { flex: 1 1 auto; min-width: 0; }
+  .head-right { flex: 0 0 auto; text-align: right; }
+  .head-logo { display: block; height: auto; width: auto; max-height: 64px; max-width: 230px; object-fit: contain; object-position: left top; margin-bottom: 10px; }
+  .co { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+  h1 { font-size: 30px; margin: 0 0 4px; letter-spacing: -0.02em; }
+  .meta { color: #6b7280; font-size: 13px; line-height: 1.7; }
+  .meta.right { text-align: right; }
+  .meta strong { color: #111827; }
+  .status-text { font-weight: 700; color: #111827; }
+  .status-text.status-paid { color: #047857; }
+  .status-text.status-overdue { color: #b91c1c; }
+  .status-text.status-sent, .status-text.status-viewed { color: #1d4ed8; }
+  .status-text.status-cancelled, .status-text.status-partially_paid { color: #b45309; }
+  .status-text.status-draft { color: #4b5563; }
+  .bill { display: flex; justify-content: space-between; gap: 32px; margin: 24px 0; font-size: 13px; }
+  .bill h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: #9ca3af; margin: 0 0 6px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: #6b7280; border-bottom: 2px solid #e5e7eb; padding: 8px 10px; }
+  tbody td { padding: 10px; border-bottom: 1px solid #f3f4f6; }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+  thead th.num { text-align: right; }
+  .totals { width: 300px; margin: 18px 0 0 auto; font-size: 13px; }
+  .totals div { display: flex; justify-content: space-between; padding: 6px 10px; }
+  .totals .grand { border-top: 2px solid #111827; font-weight: 700; font-size: 16px; margin-top: 6px; padding-top: 10px; }
+  .notes { margin-top: 32px; font-size: 12px; color: #6b7280; line-height: 1.7; }
+  .notes strong { color: #111827; display: block; margin-bottom: 2px; }
+`;
+
+const DEFAULT_INVOICE_NOTES =
+  'Thank you for your business! If you have any questions or need clarification about this invoice, please contact us using the details above.';
+
+const buildDefaultTerms = (inv: Invoice): string =>
+  `Payment is due by ${formatDate(inv.dueAt)}. Please quote ${inv.invoiceNumber} as the payment reference. Bank transfer or card payment is accepted. Overdue balances may incur a 1.5% monthly interest charge.`;
+
+const getInvoiceNotes = (inv: Invoice): string => inv.notes?.trim() || DEFAULT_INVOICE_NOTES;
+const getInvoiceTerms = (inv: Invoice): string => inv.terms?.trim() || buildDefaultTerms(inv);
+
 export function InvoicesPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [stats, setStats] = useState<InvoiceStats | null>(null);
@@ -115,11 +160,23 @@ export function InvoicesPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<Invoice | null>(null);
+  const [previewInvoice, setPreviewInvoice] = useState<Invoice | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { user } = useAuth();
+  const { organization } = useOrganization();
   const canCreate = user?.role === 'ADMIN' || user?.role === 'MANAGER' || user?.role === 'SALES';
   const canDelete = user?.role === 'ADMIN';
+
+  const savedCompany = ((organization as any)?.settings?.company || {}) as Record<string, string>;
+  const companyDetails = {
+    name: organization?.name || '',
+    logo: (organization as any)?.logo || '',
+    address: savedCompany.address || '',
+    email: savedCompany.email || '',
+    phone: savedCompany.phone || '',
+    website: savedCompany.website || '',
+  };
 
   const [form, setForm] = useState<InvoiceForm>({
     clientId: '',
@@ -279,6 +336,161 @@ export function InvoicesPage() {
     }
   };
 
+  const escapeHtml = (value: string) =>
+    String(value).replace(/[&<>"']/g, (c) =>
+      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string,
+    );
+
+  const buildInvoiceBody = (inv: Invoice): string => {
+    const clientName = (inv.clientId as any)?.companyName || '—';
+    const rows = (inv.items || [])
+      .map(
+        (i) => `<tr>
+          <td>${escapeHtml(i.description)}</td>
+          <td class="num">${i.quantity}</td>
+          <td class="num">${formatCurrency(i.unitPrice)}</td>
+          <td class="num">${formatCurrency(i.total ?? i.quantity * i.unitPrice)}</td>
+        </tr>`,
+      )
+      .join('');
+    const discount = inv.discountAmount ? `<tr><td>Discount</td><td class="num">-${formatCurrency(inv.discountAmount)}</td></tr>` : '';
+    const companyLines = [
+      companyDetails.address ? escapeHtml(companyDetails.address).replace(/\n/g, '<br/>') : '',
+      companyDetails.phone ? escapeHtml(companyDetails.phone) : '',
+      companyDetails.email ? escapeHtml(companyDetails.email) : '',
+      companyDetails.website ? escapeHtml(companyDetails.website) : '',
+    ].filter(Boolean);
+    const fromName = companyDetails.name || inv.createdBy?.name || '';
+    const fromSub =
+      companyDetails.name && inv.createdBy?.name
+        ? [inv.createdBy.name, inv.createdBy.email].filter(Boolean).map(escapeHtml).join(' &middot; ')
+        : escapeHtml(inv.createdBy?.email || '');
+    const statusText = inv.status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+    return `
+  <div class="invoice-doc">
+    <div class="head">
+      <div class="head-left">
+        ${companyDetails.logo ? `<img src="${escapeHtml(companyDetails.logo)}" alt="${escapeHtml(companyDetails.name)}" class="head-logo" />` : ''}
+        ${companyDetails.name ? `<div class="co">${escapeHtml(companyDetails.name)}</div>` : ''}
+        <div class="meta">
+          ${companyLines.join('<br/>')}
+        </div>
+      </div>
+      <div class="head-right">
+        <h1>INVOICE</h1>
+        <div class="meta right">${escapeHtml(inv.invoiceNumber)}</div>
+        <div class="meta right" style="margin-top:8px">
+          <strong>Status</strong> <span class="status-text status-${escapeHtml(inv.status)}">${escapeHtml(statusText)}</span><br/>
+          <strong>Issued</strong> ${escapeHtml(inv.issuedAt ? formatDate(inv.issuedAt) : formatDate(inv.createdAt))}<br/>
+          <strong>Due</strong> ${escapeHtml(formatDate(inv.dueAt))}
+        </div>
+      </div>
+    </div>
+    <div class="bill">
+      <div>
+        <h3>Billed To</h3>
+        <strong>${escapeHtml(clientName)}</strong>
+      </div>
+      <div style="text-align:right">
+        <h3>From</h3>
+        <strong>${escapeHtml(fromName)}</strong>${fromSub ? `<br/>${fromSub}` : ''}
+      </div>
+    </div>
+    ${inv.title ? `<p style="font-size:15px;font-weight:600;margin:0 0 12px">${escapeHtml(inv.title)}</p>` : ''}
+    <table>
+      <thead><tr><th>Description</th><th class="num">Qty</th><th class="num">Unit Price</th><th class="num">Total</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div class="totals">
+      <div><span>Subtotal</span><span>${formatCurrency(inv.subtotal)}</span></div>
+      ${inv.taxRate ? `<div><span>Tax (${inv.taxRate}%)</span><span>${formatCurrency(inv.taxAmount)}</span></div>` : ''}
+      ${discount}
+      <div class="grand"><span>Total</span><span>${formatCurrency(inv.total)}</span></div>
+      ${inv.amountPaid ? `<div><span>Paid</span><span>${formatCurrency(inv.amountPaid)}</span></div>` : ''}
+      ${inv.amountDue > 0 && inv.status !== 'draft' ? `<div><span>Amount Due</span><span>${formatCurrency(inv.amountDue)}</span></div>` : ''}
+    </div>
+    <div class="notes">
+      <strong>Notes</strong>${escapeHtml(getInvoiceNotes(inv))}
+      <strong style="margin-top:10px">Terms</strong>${escapeHtml(getInvoiceTerms(inv))}
+    </div>
+  </div>`;
+  };
+
+  const buildInvoiceHtml = (inv: Invoice): string => `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>${escapeHtml(inv.invoiceNumber)} — ${escapeHtml(inv.title || 'Invoice')}</title>
+<style>
+${INVOICE_CSS}
+</style>
+</head>
+<body>${buildInvoiceBody(inv)}</body>
+</html>`;
+
+  const handleDownloadInvoice = async (inv: Invoice) => {
+    try {
+      const [{ jsPDF }, { default: html2canvas }] = await Promise.all([import('jspdf'), import('html2canvas')]);
+
+      const container = document.createElement('div');
+      container.style.cssText = 'position:fixed;top:0;left:-10000px;width:800px;background:#fff;';
+      const styleEl = document.createElement('style');
+      styleEl.textContent = INVOICE_CSS;
+      container.appendChild(styleEl);
+      const wrap = document.createElement('div');
+      wrap.innerHTML = buildInvoiceBody(inv);
+      container.appendChild(wrap.firstElementChild || wrap);
+      document.body.appendChild(container);
+
+      let canvas: HTMLCanvasElement;
+      try {
+        canvas = await html2canvas(container, { scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false });
+      } finally {
+        container.remove();
+      }
+
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const pageWidthMm = 210;
+      const pxPerPage = Math.max(1, Math.floor(canvas.width * (297 / 210)));
+      let offsetY = 0;
+      let page = 0;
+      while (offsetY < canvas.height) {
+        const sliceHeight = Math.min(pxPerPage, canvas.height - offsetY);
+        const chunk = document.createElement('canvas');
+        chunk.width = canvas.width;
+        chunk.height = sliceHeight;
+        const ctx = chunk.getContext('2d');
+        if (!ctx) throw new Error('Canvas context unavailable');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, chunk.width, chunk.height);
+        ctx.drawImage(canvas, 0, offsetY, canvas.width, sliceHeight, 0, 0, canvas.width, sliceHeight);
+        if (page > 0) pdf.addPage();
+        const heightMm = (sliceHeight / canvas.width) * pageWidthMm;
+        pdf.addImage(chunk.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, pageWidthMm, heightMm);
+        offsetY += sliceHeight;
+        page += 1;
+      }
+
+      pdf.save(`${inv.invoiceNumber}.pdf`);
+      toast.success('Invoice PDF downloaded');
+    } catch (error) {
+      console.error('PDF generation failed:', error);
+      toast.error('PDF generation failed — use Print / Save PDF instead');
+    }
+  };
+
+  const handlePrintInvoice = (inv: Invoice) => {
+    const win = window.open('', '_blank');
+    if (!win) {
+      toast.error('Popup blocked — allow popups to print or save as PDF');
+      return;
+    }
+    win.document.write(buildInvoiceHtml(inv));
+    win.document.close();
+    win.focus();
+    setTimeout(() => win.print(), 350);
+  };
+
   const columns: Column<Invoice>[] = [
     {
       key: 'invoiceNumber',
@@ -343,9 +555,23 @@ export function InvoicesPage() {
     {
       key: 'actions',
       header: '',
-      width: '80px',
+      width: '132px',
       render: (invoice) => (
         <div className="flex items-center gap-1">
+          <button
+            onClick={() => setPreviewInvoice(invoice)}
+            className="w-8 h-8 rounded-lg hover:bg-gray-100 flex items-center justify-center text-gray-400 hover:text-gray-700 transition-colors"
+            title="Preview"
+          >
+            <Eye className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => handleDownloadInvoice(invoice)}
+            className="w-8 h-8 rounded-lg hover:bg-gray-100 flex items-center justify-center text-gray-400 hover:text-gray-700 transition-colors"
+            title="Download"
+          >
+            <Download className="w-4 h-4" />
+          </button>
           <button
             onClick={() => openEditModal(invoice)}
             className="w-8 h-8 rounded-lg hover:bg-gray-100 flex items-center justify-center text-gray-400 hover:text-gray-700 transition-colors"
@@ -608,6 +834,125 @@ export function InvoicesPage() {
             </div>
           </div>
         </div>
+      </Modal>
+
+      <Modal
+        isOpen={!!previewInvoice}
+        onClose={() => setPreviewInvoice(null)}
+        title="Invoice Preview"
+        size="lg"
+        footer={
+          previewInvoice ? (
+            <div className="flex justify-end gap-3 w-full">
+              <Button variant="secondary" leftIcon={<Printer className="w-4 h-4" />} onClick={() => handlePrintInvoice(previewInvoice)}>
+                Print / Save PDF
+              </Button>
+              <Button leftIcon={<Download className="w-4 h-4" />} onClick={() => handleDownloadInvoice(previewInvoice)}>
+                Download PDF
+              </Button>
+            </div>
+          ) : null
+        }
+      >
+        {previewInvoice && (
+          <div className="bg-white">
+            <div className="flex items-start justify-between gap-8 border-b-[3px] border-gray-900 pb-5">
+              <div className="flex items-start gap-4 min-w-0 flex-1">
+                {companyDetails.logo && (
+                  <img
+                    src={companyDetails.logo}
+                    alt={companyDetails.name || 'Company logo'}
+                    className="h-auto w-auto max-h-16 max-w-[190px] object-contain object-left-top shrink-0"
+                  />
+                )}
+                <div className="min-w-0">
+                  {companyDetails.name && <p className="text-base font-bold text-gray-900 leading-tight">{companyDetails.name}</p>}
+                  <div className="text-xs text-gray-500 mt-1 leading-relaxed whitespace-pre-line">
+                    {companyDetails.address && <p>{companyDetails.address}</p>}
+                    {companyDetails.phone && <p>{companyDetails.phone}</p>}
+                    {companyDetails.email && <p>{companyDetails.email}</p>}
+                    {companyDetails.website && <p>{companyDetails.website}</p>}
+                  </div>
+                </div>
+              </div>
+              <div className="text-right shrink-0">
+                <h3 className="text-2xl font-bold tracking-tight text-gray-900 leading-none">INVOICE</h3>
+                <p className="text-sm text-gray-500 mt-1">{previewInvoice.invoiceNumber}</p>
+                <div className="mt-2">
+                  <Badge variant={STATUS_BADGE[previewInvoice.status]?.variant || 'gray'} size="sm" className="capitalize">
+                    {previewInvoice.status.replace('_', ' ')}
+                  </Badge>
+                </div>
+                <p className="text-xs text-gray-500 mt-1.5"><span className="font-semibold text-gray-900">Issued</span> {formatDate(previewInvoice.issuedAt || previewInvoice.createdAt)}</p>
+                <p className="text-xs text-gray-500"><span className="font-semibold text-gray-900">Due</span> {formatDate(previewInvoice.dueAt)}</p>
+              </div>
+            </div>
+
+            <div className="flex justify-between gap-8 py-5 text-sm">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-400 mb-1">Billed To</p>
+                <p className="font-semibold text-gray-900">{(previewInvoice.clientId as any)?.companyName || '—'}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-400 mb-1">From</p>
+                <p className="font-semibold text-gray-900">{companyDetails.name || previewInvoice.createdBy?.name}</p>
+                {companyDetails.name && previewInvoice.createdBy?.name && (
+                  <p className="text-gray-500">{[previewInvoice.createdBy.name, previewInvoice.createdBy.email].filter(Boolean).join(' · ')}</p>
+                )}
+                {!companyDetails.name && previewInvoice.createdBy?.email && (
+                  <p className="text-gray-500">{previewInvoice.createdBy.email}</p>
+                )}
+              </div>
+            </div>
+
+            {previewInvoice.title && <p className="text-sm font-semibold text-gray-900 mb-3">{previewInvoice.title}</p>}
+
+            <div className="border border-gray-200 rounded-xl overflow-hidden">
+              <div className="grid grid-cols-[1fr_60px_110px_110px] gap-2 px-4 py-2.5 bg-gray-50 border-b border-gray-200 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <span>Description</span>
+                <span className="text-right">Qty</span>
+                <span className="text-right">Unit Price</span>
+                <span className="text-right">Total</span>
+              </div>
+              {previewInvoice.items?.map((item, i) => (
+                <div key={i} className="grid grid-cols-[1fr_60px_110px_110px] gap-2 px-4 py-2.5 border-b border-gray-100 last:border-0 text-sm">
+                  <span className="text-gray-800">{item.description}</span>
+                  <span className="text-right text-gray-600">{item.quantity}</span>
+                  <span className="text-right text-gray-600">{formatCurrency(item.unitPrice)}</span>
+                  <span className="text-right font-medium text-gray-900">{formatCurrency(item.total ?? item.quantity * item.unitPrice)}</span>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-4 ml-auto w-full sm:w-72 space-y-1.5 text-sm">
+              <div className="flex justify-between px-2.5 text-gray-600"><span>Subtotal</span><span>{formatCurrency(previewInvoice.subtotal)}</span></div>
+              {previewInvoice.taxRate > 0 && (
+                <div className="flex justify-between px-2.5 text-gray-600"><span>Tax ({previewInvoice.taxRate}%)</span><span>{formatCurrency(previewInvoice.taxAmount)}</span></div>
+              )}
+              {previewInvoice.discountAmount > 0 && (
+                <div className="flex justify-between px-2.5 text-gray-600"><span>Discount</span><span>-{formatCurrency(previewInvoice.discountAmount)}</span></div>
+              )}
+              <div className="flex justify-between border-t-2 border-gray-900 pt-2 px-2.5 font-bold text-gray-900"><span>Total</span><span className="text-lg">{formatCurrency(previewInvoice.total)}</span></div>
+              {(previewInvoice.amountPaid || 0) > 0 && (
+                <div className="flex justify-between px-2.5 text-gray-600"><span>Paid</span><span>{formatCurrency(previewInvoice.amountPaid)}</span></div>
+              )}
+              {previewInvoice.amountDue > 0 && previewInvoice.status !== 'draft' && (
+                <div className="flex justify-between px-2.5 text-gray-600"><span>Amount Due</span><span>{formatCurrency(previewInvoice.amountDue)}</span></div>
+              )}
+            </div>
+
+            <div className="mt-6 space-y-3 text-xs text-gray-500 leading-relaxed">
+              <div>
+                <span className="block font-semibold text-gray-900">Notes</span>
+                {getInvoiceNotes(previewInvoice)}
+              </div>
+              <div>
+                <span className="block font-semibold text-gray-900">Terms</span>
+                {getInvoiceTerms(previewInvoice)}
+              </div>
+            </div>
+          </div>
+        )}
       </Modal>
 
       <Modal

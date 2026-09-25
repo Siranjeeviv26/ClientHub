@@ -1,5 +1,11 @@
 import * as Joi from 'joi';
 
+const isPlaceholderSecret = (value?: string) =>
+  !value ||
+  value === 'dev-access-secret-change-in-production' ||
+  value === 'dev-refresh-secret-change-in-production' ||
+  value.length < 32;
+
 export const validationSchema = Joi.object({
   // Application
   PORT: Joi.number().port().default(3000),
@@ -9,9 +15,19 @@ export const validationSchema = Joi.object({
   // Database
   MONGODB_URI: Joi.string().uri().required(),
 
-  // JWT
-  JWT_ACCESS_SECRET: Joi.string().min(32).required(),
-  JWT_REFRESH_SECRET: Joi.string().min(32).required(),
+  // JWT — production must never use placeholder/short secrets
+  JWT_ACCESS_SECRET: Joi.string().min(32).required().custom((value, helpers) => {
+    if (process.env.NODE_ENV === 'production' && isPlaceholderSecret(value)) {
+      return helpers.error('any.invalid');
+    }
+    return value;
+  }, 'jwt-access-secret'),
+  JWT_REFRESH_SECRET: Joi.string().min(32).required().custom((value, helpers) => {
+    if (process.env.NODE_ENV === 'production' && isPlaceholderSecret(value)) {
+      return helpers.error('any.invalid');
+    }
+    return value;
+  }, 'jwt-refresh-secret'),
   JWT_ACCESS_EXPIRES_IN: Joi.string().default('15m'),
   JWT_REFRESH_EXPIRES_IN: Joi.string().default('7d'),
 
@@ -32,7 +48,7 @@ export const validationSchema = Joi.object({
   THROTTLE_TTL: Joi.number().default(60),
   THROTTLE_LIMIT: Joi.number().default(100),
 
-  // Swagger
-  SWAGGER_ENABLED: Joi.boolean().default(true),
+  // Swagger — default off (enable explicitly in non-prod)
+  SWAGGER_ENABLED: Joi.boolean().default(false),
   SWAGGER_PATH: Joi.string().default('api/docs'),
 });

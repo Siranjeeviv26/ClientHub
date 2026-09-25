@@ -23,16 +23,30 @@ export class AuditLogInterceptor implements NestInterceptor {
     }
 
     const methodMap: Record<string, string> = {
+      GET: 'read',
       POST: 'create',
       PATCH: 'update',
       PUT: 'update',
       DELETE: 'delete',
     };
 
-    // Only real mutations are stored — GET list/detail fetches are not
-    // logged so the trail holds real-life actions instead of read noise.
     const action = methodMap[method];
     if (!action) return next.handle();
+
+    // Avoid pure list-read noise: log GET only for detail (entity id in path)
+    // and sensitive entities (users, billing, audit, organizations)
+    if (method === 'GET') {
+      const entityForRead = this.extractEntity(url);
+      const sensitiveReadEntities = new Set([
+        'users', 'user', 'audit_logs', 'billing', 'organizations',
+        'super_admin', 'auth', 'invoices', 'payments',
+      ]);
+      const hasEntityId = !!this.extractEntityId(url);
+      const isSensitiveEntity = !!entityForRead && sensitiveReadEntities.has(entityForRead);
+      if (!hasEntityId && !isSensitiveEntity) {
+        return next.handle();
+      }
+    }
 
     const entity = this.extractEntity(url);
     const organizationId = user?.organizationId;

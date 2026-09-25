@@ -27,12 +27,11 @@ export class PermissionsGuard implements CanActivate {
     }
 
     const userRole = (user.role as string) || '';
-    // org id can come from JWT payload, header, or params
+    // Org ID comes only from JWT — never trust client header (prevents org spoofing)
     const organizationId: string | undefined =
       user.organizationId?.toString?.() ||
       user.organizationId ||
-      request.headers?.['x-organization-id'] ||
-      request.user?.organizationId?.toString?.();
+      undefined;
 
     let userPermissions: string[] = [];
     if (this.rolesService && organizationId) {

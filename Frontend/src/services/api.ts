@@ -8,6 +8,8 @@ const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || '/api/v1';
 class ApiService {
   private client: AxiosInstance;
   private refreshTokenPromise: Promise<string> | null = null;
+  /** In-memory only — never persisted (XSS cannot steal via localStorage). */
+  private accessTokenMemory: string | null = null;
 
   constructor() {
     this.client = axios.create({
@@ -15,7 +17,7 @@ class ApiService {
       headers: {
         'Content-Type': 'application/json',
       },
-      withCredentials: false,
+      withCredentials: true,
     });
 
     this.setupInterceptors();
@@ -24,7 +26,7 @@ class ApiService {
   private setupInterceptors() {
     this.client.interceptors.request.use(
       (config: InternalAxiosRequestConfig) => {
-        const accessToken = localStorage.getItem('accessToken');
+        const accessToken = this.accessTokenMemory;
         if (accessToken && config.headers) {
           config.headers.Authorization = `Bearer ${accessToken}`;
         }
@@ -48,7 +50,7 @@ class ApiService {
             }
             return this.client(originalRequest);
           } catch (refreshError) {
-            const wasLoggedIn = !!localStorage.getItem('refreshToken');
+            const wasLoggedIn = !!this.accessTokenMemory || !!localStorage.getItem('user');
             this.clearAuth();
             if (wasLoggedIn) {
               window.location.href = '/login';
@@ -71,22 +73,17 @@ class ApiService {
       return this.refreshTokenPromise;
     }
 
-    const refreshToken = localStorage.getItem('refreshToken');
-    if (!refreshToken) {
-      throw new Error('No refresh token available');
-    }
-
     this.refreshTokenPromise = (async () => {
       try {
+        // Prefer httpOnly cookie; body token optional for non-browser clients
         const response = await axios.post<{ data: AuthTokens }>(
           `${API_BASE_URL}/auth/refresh`,
-          { refreshToken },
-          { headers: { 'Content-Type': 'application/json' } },
+          {},
+          { withCredentials: true, headers: { 'Content-Type': 'application/json' } },
         );
 
-        const { accessToken, refreshToken: newRefreshToken } = response.data.data;
-        localStorage.setItem('accessToken', accessToken);
-        localStorage.setItem('refreshToken', newRefreshToken);
+        const { accessToken } = response.data.data;
+        this.accessTokenMemory = accessToken;
         return accessToken;
       } finally {
         this.refreshTokenPromise = null;
@@ -97,8 +94,7 @@ class ApiService {
   }
 
   private clearAuth() {
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('refreshToken');
+    this.accessTokenMemory = null;
     localStorage.removeItem('user');
     localStorage.removeItem('organization');
   }
@@ -139,8 +135,8 @@ class ApiService {
     return this.unwrapResponse<T>(response);
   }
 
-  async delete<T>(url: string) {
-    const response = await this.client.delete(url);
+  async delete<T>(url: string, data?: any) {
+    const response = await this.client.delete(url, data ? { data } : undefined);
     if (response.status === 204 || !response.data) {
       return { success: true, data: null as T };
     }
@@ -163,20 +159,21 @@ class ApiService {
   }
 
   setAuth(tokens: AuthTokens) {
-    localStorage.setItem('accessToken', tokens.accessToken);
-    localStorage.setItem('refreshToken', tokens.refreshToken);
+    // Persist only in memory; httpOnly cookies set by the server
+    this.accessTokenMemory = tokens.accessToken;
   }
 
   getAccessToken(): string | null {
-    return localStorage.getItem('accessToken');
+    return this.accessTokenMemory;
   }
 
   getRefreshToken(): string | null {
-    return localStorage.getItem('refreshToken');
+    // Refresh token lives only in httpOnly cookie — not readable by JS
+    return null;
   }
 
   isAuthenticated(): boolean {
-    return !!this.getAccessToken();
+    return !!this.getAccessToken() || !!localStorage.getItem('user');
   }
 
   logout() {
@@ -239,8 +236,8 @@ class ApiService {
     return this.patch<{ data: Organization }>(`/organizations/${id}`, data);
   }
 
-  async deleteOrganization(id: string) {
-    return this.delete(`/organizations/${id}`);
+  async deleteOrganization(id: string, password?: string) {
+    return this.delete(`/organizations/${id}`, password ? { password } : undefined);
   }
 
   async getMembers() {

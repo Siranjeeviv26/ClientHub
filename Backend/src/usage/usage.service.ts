@@ -138,4 +138,12 @@ export class UsageService {
       { emailsSent: 0 },
     ).exec();
   }
+
+  async syncStorageUsage(organizationId: string, bytes: number): Promise<void> {
+    const usage = await this.getOrCreateCurrentUsage(organizationId);
+    await this.usageModel.findByIdAndUpdate(
+      usage._id,
+      { storageUsed: Math.max(0, bytes) },
+    ).exec();
+  }
 }

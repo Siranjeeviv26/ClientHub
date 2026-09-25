@@ -12,6 +12,7 @@ import {
   UploadedFile,
   HttpCode,
   HttpStatus,
+  BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiConsumes, ApiBody, ApiQuery, ApiResponse } from '@nestjs/swagger';
@@ -78,7 +79,18 @@ export class UsersController {
   }
 
   @Post('profile/avatar')
-  @UseInterceptors(FileInterceptor('avatar'))
+  @UseInterceptors(
+    FileInterceptor('avatar', {
+      limits: { fileSize: 2 * 1024 * 1024 },
+      fileFilter: (_req, file, callback) => {
+        const allowed = ['image/png', 'image/jpeg', 'image/webp'];
+        if (!allowed.includes(file.mimetype)) {
+          return callback(new BadRequestException(`Avatar must be one of: ${allowed.join(', ')}`), false);
+        }
+        callback(null, true);
+      },
+    }),
+  )
   @ApiConsumes('multipart/form-data')
   @ApiBody({ schema: { type: 'object', properties: { avatar: { type: 'string', format: 'binary' } } } })
   @ApiOperation({ summary: 'Upload profile avatar' })

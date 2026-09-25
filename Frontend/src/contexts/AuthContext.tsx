@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { User, AuthTokens } from '../types';
+import { User } from '../types';
 import { authApi } from '../api/auth';
 import api from '../services/api';
 
@@ -21,36 +21,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   const loadStoredAuth = useCallback(async () => {
+    // User profile cached in localStorage (non-sensitive); tokens are httpOnly cookies
     let storedUser = null;
     try {
       const raw = localStorage.getItem('user');
       if (raw) storedUser = JSON.parse(raw);
     } catch { /* corrupted storage */ }
-    const accessToken = localStorage.getItem('accessToken');
 
-    if (storedUser && accessToken) {
-      try {
-        setUser(storedUser);
-        // Verify token is still valid by fetching profile
-        await refreshUser();
-        window.dispatchEvent(new Event('auth:login'));
-      } catch {
-        api.logout();
-        setUser(null);
-      }
+    if (storedUser) {
+      setUser(storedUser);
+    }
+
+    // Always try profile fetch — cookie or in-memory token authenticates
+    try {
+      await refreshUser();
+      window.dispatchEvent(new Event('auth:login'));
+    } catch {
+      api.logout();
+      setUser(null);
     }
     setIsLoading(false);
   }, []);
 
-  const refreshUser = useCallback(async () => {
+  const refreshUser = useCallback(async (): Promise<void> => {
     try {
       const response = await authApi.getProfile();
       if (response.success && response.data) {
         const userData = response.data;
         setUser(userData);
         localStorage.setItem('user', JSON.stringify(userData));
-        return userData;
+        return;
       }
+      throw new Error(response.message || 'Failed to refresh user');
     } catch (error) {
       console.error('Failed to refresh user:', error);
       throw error;
@@ -80,10 +82,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(async () => {
     try {
-      const refreshToken = api.getRefreshToken();
-      if (refreshToken) {
-        await authApi.logout();
-      }
+      await authApi.logout();
     } catch (error) {
       console.error('Logout error:', error);
     } finally {

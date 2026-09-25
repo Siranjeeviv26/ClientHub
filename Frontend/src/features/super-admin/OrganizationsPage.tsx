@@ -11,7 +11,6 @@ import toast from 'react-hot-toast';
 interface CreatedCredentials {
   organization: { _id: string; name: string; slug: string };
   admin: { _id: string; email: string; firstName: string; lastName: string; role: string };
-  temporaryPassword: string;
   paymentLink?: { url: string; expiresAt: string } | null;
 }
 
@@ -100,7 +99,7 @@ export default function OrganizationsPage() {
 
   const copyCredentials = () => {
     if (!credentials) return;
-    const text = `Organization: ${credentials.organization.name}\nAdmin Email: ${credentials.admin.email}\nPassword: ${credentials.temporaryPassword}`;
+    const text = `Organization: ${credentials.organization.name}\nAdmin Email: ${credentials.admin.email}\nAsk the admin to use "Forgot password" to set their own password.`;
     navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -248,7 +247,7 @@ export default function OrganizationsPage() {
               <h2 className="text-lg font-bold text-gray-900">Organization Created</h2>
               <button onClick={() => setCredentials(null)} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
             </div>
-            <p className="text-gray-500 text-sm mb-4">Share these credentials with the organization admin. The password is shown only once.</p>
+            <p className="text-gray-500 text-sm mb-4">Share the admin email with the organization admin. They can set their password via "Forgot password".</p>
             <div className="bg-gray-50 rounded-lg p-4 space-y-3 border border-gray-200">
               <div>
                 <p className="text-xs text-gray-400 uppercase tracking-wider">Organization</p>
@@ -260,7 +259,7 @@ export default function OrganizationsPage() {
               </div>
               <div>
                 <p className="text-xs text-gray-400 uppercase tracking-wider">Password</p>
-                <p className="text-gray-900 font-mono font-medium">{credentials.temporaryPassword}</p>
+                <p className="text-gray-600 text-sm">Not shown — admin sets it via password reset.</p>
               </div>
               {credentials.paymentLink && (
                 <div>

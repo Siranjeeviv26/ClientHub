@@ -1,4 +1,4 @@
-import { Controller, Post, UseGuards } from '@nestjs/common';
+import { Controller, Post, UseGuards, ForbiddenException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
 
 import { SeedService } from './seed.service';
@@ -15,10 +15,14 @@ export class SeedController {
   constructor(private seedService: SeedService) {}
 
   @Post()
-  @Roles('ADMIN')
-  @ApiOperation({ summary: 'Seed demo data (Admin only)' })
+  @Roles('SUPER_ADMIN')
+  @ApiOperation({ summary: 'Seed demo data (Super Admin only)' })
   @ApiResponse({ status: 200, description: 'Demo data seeded' })
+  @ApiResponse({ status: 403, description: 'Forbidden — SUPER_ADMIN required' })
   async seed() {
+    if (process.env.NODE_ENV === 'production') {
+      throw new ForbiddenException('Seeding is disabled in production');
+    }
     await this.seedService.seedDemoData();
     return { message: 'Demo data seeded successfully' };
   }

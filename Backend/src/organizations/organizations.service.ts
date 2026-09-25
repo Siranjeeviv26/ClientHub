@@ -10,6 +10,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { ConfigService } from '@nestjs/config';
 import { v4 as uuidv4 } from 'uuid';
+import * as bcrypt from 'bcryptjs';
 
 import { Organization, OrganizationDocument } from './schemas/organization.schema';
 import { OrganizationMember, OrganizationMemberDocument } from './schemas/organization-member.schema';
@@ -174,8 +175,18 @@ export class OrganizationsService {
     return organization;
   }
 
-  async delete(organizationId: string, userId: string): Promise<void> {
+  async delete(organizationId: string, userId: string, password: string): Promise<void> {
     await this.checkPermission(organizationId, userId, 'organization:delete');
+
+    // Step-up re-authentication for destructive action (H-07)
+    const user = await this.userModel.findById(userId).select('+passwordHash');
+    if (!user || !password) {
+      throw new ForbiddenException('Password confirmation required');
+    }
+    const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
+    if (!isPasswordValid) {
+      throw new ForbiddenException('Password confirmation failed');
+    }
 
     // Check if user is the only admin
     const adminCount = await this.memberModel.countDocuments({
@@ -440,10 +451,10 @@ export class OrganizationsService {
       await this.storageService.deleteByUrl(organization.logo);
     }
 
-    // Upload new logo to Cloudinary
+    // Upload new logo to Cloudinary — fit within bounds without cropping
     const result = await this.storageService.upload(file, {
       folder: `clienthub/organizations/${organizationId}/logo`,
-      transformation: [{ width: 256, height: 256, crop: 'fill', gravity: 'auto' }],
+      transformation: [{ width: 256, height: 256, crop: 'limit' }],
     });
 
     organization.logo = result.url;
@@ -472,7 +483,19 @@ export class OrganizationsService {
   async updateSettings(organizationId: string, userId: string, settings: Record<string, any>) {
     await this.checkPermission(organizationId, userId, 'organization:settings:update');
     const organization = await this.findById(organizationId);
-    organization.settings = { ...organization.settings, ...settings };
+    // Only allow known settings keys — prevent mass assignment of arbitrary fields
+    const allowedKeys = [
+      'timezone', 'dateFormat', 'currency', 'language',
+      'workingHours', 'notifications',
+      'invoice', 'security', 'company',
+    ] as const;
+    const sanitized: Record<string, any> = {};
+    for (const key of allowedKeys) {
+      if (settings && Object.prototype.hasOwnProperty.call(settings, key)) {
+        sanitized[key] = settings[key];
+      }
+    }
+    organization.settings = { ...organization.settings, ...sanitized };
     await organization.save();
     return organization.settings;
   }

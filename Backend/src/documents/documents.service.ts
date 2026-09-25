@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
   Logger,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
@@ -11,9 +12,17 @@ import { Express } from 'express';
 import { Documents, DocumentDocument } from './schemas/document.schema';
 import { CreateDocumentDto, QueryDocumentsDto } from './dto/create-document.dto';
 import { StorageService } from '../storage/storage.service';
+import { UsageService } from '../usage/usage.service';
 
 function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes >= 1073741824) return `${(bytes / 1073741824).toFixed(1)} GB`;
+  if (bytes >= 1048576) return `${(bytes / 1048576).toFixed(1)} MB`;
+  if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${bytes} B`;
 }
 
 @Injectable()
@@ -24,6 +33,7 @@ export class DocumentsService {
     @InjectModel(Documents.name)
     private readonly documentModel: Model<DocumentDocument>,
     private readonly storageService: StorageService,
+    private readonly usageService: UsageService,
   ) {}
 
   async create(
@@ -34,6 +44,21 @@ export class DocumentsService {
   ): Promise<DocumentDocument> {
     if (!file) {
       throw new BadRequestException('No file provided');
+    }
+
+    // Enforce the plan's storageLimit before touching Cloudinary.
+    // Recompute actual usage from stored docs so pre-existing files count.
+    const agg = await this.documentModel.aggregate([
+      { $match: { organizationId: new Types.ObjectId(organizationId) } },
+      { $group: { _id: null, total: { $sum: '$fileSize' } } },
+    ]).exec();
+    const actualUsed = agg[0]?.total || 0;
+    await this.usageService.syncStorageUsage(organizationId, actualUsed);
+    const check = await this.usageService.checkLimit(organizationId, 'storage');
+    if (check.limit !== -1 && actualUsed + file.size > check.limit) {
+      throw new ForbiddenException(
+        `Storage limit exceeded for your plan (${formatBytes(actualUsed)} used of ${formatBytes(check.limit)}). Delete files or upgrade your plan.`,
+      );
     }
 
     const uploadResult = await this.storageService.upload(file, {
@@ -57,6 +82,7 @@ export class DocumentsService {
     });
 
     this.logger.log(`Document created: ${document.fileName} (${document._id})`);
+    await this.usageService.incrementUsage(organizationId, 'storage', file.size);
     return document;
   }
 
@@ -95,8 +121,11 @@ export class DocumentsService {
 
     let sort: any = { createdAt: -1 };
     if (query.sort) {
-      const sortParts = query.sort.split(':');
-      sort = { [sortParts[0]]: sortParts[1] === 'asc' ? 1 : -1 };
+      const [field, dir] = query.sort.split(':');
+      const allowedSortKeys = new Set(['createdAt', 'fileName', 'fileSize', 'fileType', 'folder', 'updatedAt']);
+      if (allowedSortKeys.has(field)) {
+        sort = { [field]: dir === 'asc' ? 1 : -1 };
+      }
     }
 
     const [documents, total] = await Promise.all([
@@ -160,6 +189,7 @@ export class DocumentsService {
     }
 
     await document.deleteOne();
+    await this.usageService.decrementUsage(organizationId, 'storage', document.fileSize || 0);
     this.logger.log(`Document deleted: ${document.fileName}`);
   }
 

@@ -4,6 +4,13 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
 import { AuthService } from '../auth.service';
 
+function fromCookieOrHeader(req: any): string | null {
+  if (req?.cookies?.accessToken) {
+    return req.cookies.accessToken;
+  }
+  return null;
+}
+
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   constructor(
@@ -11,7 +18,10 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     private authService: AuthService,
   ) {
     super({
-      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      jwtFromRequest: ExtractJwt.fromExtractors([
+        fromCookieOrHeader,
+        ExtractJwt.fromAuthHeaderAsBearerToken(),
+      ]),
       ignoreExpiration: false,
       secretOrKey: configService.get<string>('app.jwt.accessSecret'),
     });

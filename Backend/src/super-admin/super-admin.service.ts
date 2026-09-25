@@ -145,12 +145,13 @@ export class SuperAdminService {
       this.logger.warn(`Org-created email failed for ${adminUser.email}: ${e?.message || e}`);
     }
 
-    return {
+    const response: Record<string, any> = {
       organization: { _id: organization._id, name: organization.name, slug: organization.slug },
       admin: { _id: adminUser._id, email: adminUser.email, firstName: adminUser.firstName, lastName: adminUser.lastName, role: adminUser.role },
-      temporaryPassword: dto.adminPassword,
       paymentLink,
     };
+    // Never include temporaryPassword in API response (C-05 / H-03)
+    return response;
   }
 
   async getAllOrganizations(query: { page?: number; limit?: number; search?: string; status?: string }) {
@@ -305,6 +306,19 @@ export class SuperAdminService {
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
     const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
 
+    const activeSubs = await this.organizationModel
+      .find({ 'subscription.status': { $in: ['active', 'trialing'] } })
+      .select('subscription.plan')
+      .lean()
+      .exec();
+    const planSlugs = [...new Set((activeSubs as any[]).map((o) => o.subscription?.plan).filter(Boolean))];
+    const subPlans = planSlugs.length
+      ? await this.planModel.find({ slug: { $in: planSlugs } }).select('slug price').lean().exec()
+      : [];
+    const priceBySlug = new Map<string, number>(subPlans.map((p: any) => [p.slug, p.price || 0]));
+    // Monthly Recurring Revenue: sum of plan amounts of active subscriptions
+    const mrr = (activeSubs as any[]).reduce((sum, o) => sum + (priceBySlug.get(o.subscription?.plan) || 0), 0);
+
     const [
       totalOrgs,
       activeOrgs,
@@ -317,6 +331,10 @@ export class SuperAdminService {
       previousMonthRevenue,
       newOrgsThisMonth,
       newOrgsLastMonth,
+      newUsersThisMonth,
+      newUsersLastMonth,
+      wonDealsThisMonth,
+      wonDealsLastMonth,
     ] = await Promise.all([
       this.organizationModel.countDocuments().exec(),
       this.organizationModel.countDocuments({ 'subscription.status': { $in: ['active', 'trialing'] } }).exec(),
@@ -338,6 +356,10 @@ export class SuperAdminService {
       ]).exec(),
       this.organizationModel.countDocuments({ createdAt: { $gte: thirtyDaysAgo } }).exec(),
       this.organizationModel.countDocuments({ createdAt: { $gte: sixtyDaysAgo, $lt: thirtyDaysAgo } }).exec(),
+      this.userModel.countDocuments({ createdAt: { $gte: thirtyDaysAgo } }).exec(),
+      this.userModel.countDocuments({ createdAt: { $gte: sixtyDaysAgo, $lt: thirtyDaysAgo } }).exec(),
+      this.dealModel.countDocuments({ stage: 'won', createdAt: { $gte: thirtyDaysAgo } }).exec(),
+      this.dealModel.countDocuments({ stage: 'won', createdAt: { $gte: sixtyDaysAgo, $lt: thirtyDaysAgo } }).exec(),
     ]);
 
     const monthlyGrowth = previousMonthRevenue[0]?.total > 0
@@ -346,6 +368,14 @@ export class SuperAdminService {
 
     const orgGrowth = newOrgsLastMonth > 0
       ? Math.round((newOrgsThisMonth - newOrgsLastMonth) / newOrgsLastMonth * 100)
+      : 0;
+
+    const userGrowth = newUsersLastMonth > 0
+      ? Math.round((newUsersThisMonth - newUsersLastMonth) / newUsersLastMonth * 100)
+      : 0;
+
+    const dealGrowth = wonDealsLastMonth > 0
+      ? Math.round((wonDealsThisMonth - wonDealsLastMonth) / wonDealsLastMonth * 100)
       : 0;
 
     return {
@@ -357,9 +387,14 @@ export class SuperAdminService {
       totalDeals,
       platformRevenue: platformRevenue[0]?.total || 0,
       currentMonthRevenue: currentMonthRevenue[0]?.total || 0,
+      mrr,
       monthlyGrowth,
       orgGrowth,
       newOrgsThisMonth,
+      newUsersThisMonth,
+      userGrowth,
+      wonDealsThisMonth,
+      dealGrowth,
     };
   }
 

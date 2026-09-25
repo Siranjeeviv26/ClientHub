@@ -80,8 +80,16 @@ export class StripeProvider implements PaymentProvider {
   }
 
   async verifyWebhookSignature(params: { payload: Buffer | string; signature: string; secret: string }): Promise<any> {
+    if (!params.secret) {
+      throw new Error('Webhook secret not configured');
+    }
+    if (!params.signature) {
+      throw new Error('Missing webhook signature');
+    }
     if (!this.stripe) {
-      return JSON.parse(params.payload.toString());
+      // Fail closed in mock mode when secret is configured but SDK missing —
+      // still verify HMAC is non-empty; never accept unsigned events.
+      throw new Error('Stripe SDK not available for webhook verification');
     }
     return this.stripe.webhooks.constructEvent(params.payload, params.signature, params.secret);
   }

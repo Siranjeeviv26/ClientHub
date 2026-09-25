@@ -43,6 +43,37 @@ export class UpdateOrganizationSettingsDto {
     taskDueSoon?: boolean;
     dealUpdated?: boolean;
   };
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsObject()
+  invoice?: {
+    prefix?: string;
+    nextNumber?: number;
+    defaultTaxRate?: number;
+    paymentTerms?: number;
+  };
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsObject()
+  security?: {
+    passwordMinLength?: number;
+    requireUppercase?: boolean;
+    requireNumbers?: boolean;
+    sessionTimeout?: number;
+  };
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsObject()
+  company?: {
+    website?: string;
+    phone?: string;
+    email?: string;
+    address?: string;
+    logo?: string;
+  };
 }
 
 export class UpdateOrganizationDto {

@@ -34,8 +34,8 @@ export class EmailService {
 
   async sendEmail(data: EmailJobData): Promise<void> {
     if (!this.apiKey) {
+      // Log metadata only — never log HTML/text bodies (may contain temp passwords/PII)
       this.logger.log(`📧 [DEV MODE] Email to ${data.to}: ${data.subject}`);
-      this.logger.debug(`HTML: ${data.html}`);
       return;
     }
 
@@ -85,8 +85,8 @@ export class EmailService {
     await this.sendEmail({
       to: email,
       subject: `Your ${organizationName} workspace is ready - ClientHub`,
-      html: this.getOrgCreatedTemplate(firstName, organizationName, email, tempPassword, loginUrl, payUrl, expiryDate),
-      text: `Your ${organizationName} workspace is ready. Sign in at ${loginUrl} with ${email} and the password shared by your administrator.${payUrl ? ` Complete your plan payment here (valid until ${expiryDate}): ${payUrl}` : ''}`,
+      html: this.getOrgCreatedTemplate(firstName, organizationName, email, loginUrl, payUrl, expiryDate),
+      text: `Your ${organizationName} workspace is ready. Sign in at ${loginUrl} with ${email}. Your administrator will provide credentials or use the password reset link.${payUrl ? ` Complete your plan payment here (valid until ${expiryDate}): ${payUrl}` : ''}`,
     });
   }
 
@@ -428,7 +428,7 @@ export class EmailService {
     `;
   }
 
-  private getOrgCreatedTemplate(firstName: string, organizationName: string, email: string, tempPassword: string, loginUrl: string, payUrl?: string, expiryDate?: string): string {
+  private getOrgCreatedTemplate(firstName: string, organizationName: string, email: string, loginUrl: string, payUrl?: string, expiryDate?: string): string {
     return `
       <!DOCTYPE html>
       <html>
@@ -442,12 +442,12 @@ export class EmailService {
           </div>
           <div style="background: #f9fafb; padding: 30px; border-radius: 0 0 12px 12px; border: 1px solid #e5e7eb;">
             <h2 style="color: #1f2937; margin-top: 0;">Your workspace is ready, ${firstName}!</h2>
-            <p style="color: #4b5563;">An organization <strong>${organizationName}</strong> was created for you. Sign in with these credentials:</p>
+            <p style="color: #4b5563;">An organization <strong>${organizationName}</strong> was created for you. Sign in with your email:</p>
             <div style="background: white; border-radius: 8px; padding: 20px; margin: 20px 0; border: 1px solid #e5e7eb;">
               <p style="margin: 0; color: #6b7280; font-size: 14px;">Email</p>
               <p style="margin: 4px 0 12px; color: #111827; font-weight: 600;">${email}</p>
-              <p style="margin: 0; color: #6b7280; font-size: 14px;">Temporary password</p>
-              <p style="margin: 4px 0 0; color: #111827; font-weight: 600; font-family: monospace;">${tempPassword}</p>
+              <p style="margin: 0; color: #6b7280; font-size: 14px;">Credentials</p>
+              <p style="margin: 4px 0 0; color: #111827; font-size: 14px;">Your administrator will share your password securely, or use "Forgot password" to set one.</p>
             </div>
             <div style="text-align: center; margin: 30px 0;">
               <a href="${loginUrl}" style="background: #111827; color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; display: inline-block;">Sign In</a>

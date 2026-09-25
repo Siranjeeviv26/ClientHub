@@ -24,10 +24,11 @@ export class PlanLimitsGuard implements CanActivate {
 
     if (!user) return true;
 
+    // Org ID from JWT only — never trust client header
     const organizationId =
       user.organizationId?.toString?.() ||
       user.organizationId ||
-      request.headers?.['x-organization-id'];
+      undefined;
 
     if (!organizationId) return true;
 

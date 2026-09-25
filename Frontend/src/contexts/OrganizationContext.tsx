@@ -70,13 +70,10 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
 
   const switchOrganization = useCallback(async (organizationId: string) => {
     try {
-      const token = localStorage.getItem('accessToken');
-      if (token) {
-        const res = await api.post<{ accessToken: string; refreshToken: string; expiresIn: number }>('/auth/switch-organization', { organizationId });
-        if (res.success && res.data) {
-          localStorage.setItem('accessToken', res.data.accessToken);
-          localStorage.setItem('refreshToken', res.data.refreshToken);
-        }
+      // Always attempt switch — auth uses httpOnly cookies / in-memory token
+      const res = await api.post<{ accessToken: string; refreshToken: string; expiresIn: number }>('/auth/switch-organization', { organizationId });
+      if (res.success && res.data) {
+        api.setAuth(res.data);
       }
       const response = await organizationsApi.getById(organizationId);
       if (response.success && response.data) {
@@ -90,14 +87,13 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const init = async () => {
-      const token = localStorage.getItem('accessToken');
-      if (!token) {
-        setIsLoading(false);
-        return;
-      }
+      // Session may exist via httpOnly cookie even without localStorage token
       setIsLoading(true);
-      await loadOrganizations();
-      setIsLoading(false);
+      try {
+        await loadOrganizations();
+      } finally {
+        setIsLoading(false);
+      }
     };
     init();
 

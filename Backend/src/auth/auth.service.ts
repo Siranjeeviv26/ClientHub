@@ -139,9 +139,17 @@ export class AuthService {
     return tokens;
   }
 
-  async logout(userId: string, refreshTokenHash: string): Promise<void> {
+  async logout(userId: string, refreshToken: string): Promise<void> {
+    const tokenHash = this.hashToken(refreshToken);
     await this.refreshTokenModel.findOneAndUpdate(
-      { tokenHash: refreshTokenHash, userId: new Types.ObjectId(userId) },
+      { tokenHash, userId: new Types.ObjectId(userId) },
+      { revoked: true, revokedAt: new Date() },
+    );
+  }
+
+  async revokeAllUserTokensForLogout(userId: string): Promise<void> {
+    await this.refreshTokenModel.updateMany(
+      { userId: new Types.ObjectId(userId), revoked: false },
       { revoked: true, revokedAt: new Date() },
     );
   }
@@ -379,7 +387,10 @@ export class AuthService {
   }
 
   private hashToken(token: string): string {
-    return bcrypt.hashSync(token, 10);
+    // Use SHA-256 (deterministic) — bcrypt salts are random so hashSync
+    // cannot be used for lookup (findOne({ tokenHash }) would never match)
+    const crypto = require('crypto');
+    return crypto.createHash('sha256').update(token).digest('hex');
   }
 
   private parseExpiresIn(expiresIn: string): number {

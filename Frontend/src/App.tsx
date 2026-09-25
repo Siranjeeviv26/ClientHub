@@ -264,11 +264,24 @@ function RoleRoute({ allowed }: { allowed: string[] }) {
     );
   }
 
-  if (!user || !allowed.includes(user.role as string)) {
-    return <Navigate to="/dashboard" replace />;
+  // SUPER_ADMIN bypasses org-level role gates (UX only — API still enforces)
+  if (user && (user.role === 'SUPER_ADMIN' || allowed.includes(user.role as string))) {
+    return <Outlet />;
   }
 
-  return <Outlet />;
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center gap-3 p-6">
+      <p className="text-lg font-semibold text-gray-900">Access denied</p>
+      <p className="text-sm text-gray-500">You do not have permission to view this page.</p>
+      <button
+        type="button"
+        className="mt-2 text-sm text-primary-600 hover:underline"
+        onClick={() => { window.location.href = '/dashboard'; }}
+      >
+        Back to dashboard
+      </button>
+    </div>
+  );
 }
 
 function App() {

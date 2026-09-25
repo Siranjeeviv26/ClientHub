@@ -5,6 +5,7 @@ import { DocumentsService } from './documents.service';
 import { DocumentsController } from './documents.controller';
 import { Documents, DocumentsSchema } from './schemas/document.schema';
 import { StorageModule } from '../storage/storage.module';
+import { UsageModule } from '../usage/usage.module';
 
 @Module({
   imports: [
@@ -12,6 +13,7 @@ import { StorageModule } from '../storage/storage.module';
       { name: Documents.name, schema: DocumentsSchema },
     ]),
     StorageModule,
+    UsageModule,
   ],
   controllers: [DocumentsController],
   providers: [DocumentsService],

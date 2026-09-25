@@ -12,6 +12,7 @@ import {
   UploadedFile,
   HttpCode,
   HttpStatus,
+  BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiConsumes, ApiBody, ApiResponse } from '@nestjs/swagger';
@@ -19,7 +20,8 @@ import { Express } from 'express';
 
 import { OrganizationsService } from './organizations.service';
 import { CreateOrganizationDto } from './dto/create-organization.dto';
-import { UpdateOrganizationDto } from './dto/update-organization.dto';
+import { UpdateOrganizationDto, UpdateOrganizationSettingsDto } from './dto/update-organization.dto';
+import { DeleteOrganizationDto } from './dto/delete-organization.dto';
 import { InviteMemberDto } from './dto/invite-member.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -30,6 +32,9 @@ import { Permissions } from '../common/decorators/permissions.decorator';
 import { Public } from '../common/decorators/public.decorator';
 import { CheckPlanRole } from '../billing/decorators/require-plan-role.decorator';
 import { PlanRoleGuard } from '../billing/guards/plan-role.guard';
+
+const LOGO_MAX_SIZE = 2 * 1024 * 1024; // 2MB
+const LOGO_ALLOWED_MIME = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'];
 
 @ApiTags('Organizations')
 @Controller('organizations')
@@ -79,10 +84,14 @@ export class OrganizationsController {
   @Roles('ADMIN')
   @Permissions('organization:delete')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Delete organization' })
+  @ApiOperation({ summary: 'Delete organization (requires password confirmation)' })
   @ApiResponse({ status: 204, description: 'Organization deleted' })
-  async delete(@Param('id') id: string, @CurrentUser('_id') userId: string) {
-    return this.organizationsService.delete(id, userId);
+  async delete(
+    @Param('id') id: string,
+    @CurrentUser('_id') userId: string,
+    @Body() dto: DeleteOrganizationDto,
+  ) {
+    return this.organizationsService.delete(id, userId, dto.password);
   }
 
   // Members
@@ -183,7 +192,22 @@ export class OrganizationsController {
   // Logo
   @Post(':id/logo')
   @Permissions('organization:logo:upload')
-  @UseInterceptors(FileInterceptor('logo'))
+  @UseInterceptors(
+    FileInterceptor('logo', {
+      limits: { fileSize: LOGO_MAX_SIZE },
+      fileFilter: (_req, file, callback) => {
+        if (!LOGO_ALLOWED_MIME.includes(file.mimetype)) {
+          return callback(
+            new BadRequestException(
+              `Logo must be one of: ${LOGO_ALLOWED_MIME.join(', ')}`,
+            ),
+            false,
+          );
+        }
+        callback(null, true);
+      },
+    }),
+  )
   @ApiConsumes('multipart/form-data')
   @ApiBody({ schema: { type: 'object', properties: { logo: { type: 'string', format: 'binary' } } } })
   @ApiOperation({ summary: 'Upload organization logo' })
@@ -221,8 +245,8 @@ export class OrganizationsController {
   async updateSettings(
     @Param('id') id: string,
     @CurrentUser('_id') userId: string,
-    @Body() body: Record<string, any>,
+    @Body() body: UpdateOrganizationSettingsDto,
   ) {
-    return this.organizationsService.updateSettings(id, userId, body);
+    return this.organizationsService.updateSettings(id, userId, body as Record<string, any>);
   }
 }

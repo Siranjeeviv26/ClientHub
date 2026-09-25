@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
-import { APP_INTERCEPTOR } from '@nestjs/core';
+import { APP_INTERCEPTOR, APP_GUARD } from '@nestjs/core';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import configuration from './config/configuration';
 import { validationSchema } from './config/validation.schema';
@@ -96,6 +96,11 @@ import { HealthModule } from './health/health.module';
     {
       provide: APP_INTERCEPTOR,
       useClass: AuditLogInterceptor,
+    },
+    {
+      // Global rate limiting for all routes (auth controller has tighter per-route limits)
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
     },
   ],
 })

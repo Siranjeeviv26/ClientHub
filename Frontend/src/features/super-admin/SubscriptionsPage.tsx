@@ -170,29 +170,47 @@ export default function SubscriptionsPage() {
             ) : planPayments.length === 0 ? (
               <div className="text-center py-12 text-gray-500">No plan purchases yet — Razorpay checkouts appear here automatically</div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full">
+              <div className="overflow-hidden">
+                <table className="w-full table-fixed">
                   <thead>
-                    <tr className="border-b border-gray-100">
-                      <th className="text-left px-6 py-4 text-sm font-medium text-gray-500">Date</th>
-                      <th className="text-left px-6 py-4 text-sm font-medium text-gray-500">Organization</th>
-                      <th className="text-left px-6 py-4 text-sm font-medium text-gray-500">Plan</th>
-                      <th className="text-left px-6 py-4 text-sm font-medium text-gray-500">Amount</th>
-                      <th className="text-left px-6 py-4 text-sm font-medium text-gray-500">Order ID</th>
-                      <th className="text-left px-6 py-4 text-sm font-medium text-gray-500">Payment ID</th>
-                      <th className="text-left px-6 py-4 text-sm font-medium text-gray-500">Status</th>
+                    <tr className="bg-gray-50/60 border-b border-gray-200/70">
+                      <th className="hidden md:table-cell text-left px-6 py-3.5 text-[11px] font-semibold tracking-widest uppercase text-gray-500 w-[150px]">Date</th>
+                      <th className="text-left px-6 py-3.5 text-[11px] font-semibold tracking-widest uppercase text-gray-500">Organization</th>
+                      <th className="text-left px-6 py-3.5 text-[11px] font-semibold tracking-widest uppercase text-gray-500 w-[100px]">Plan</th>
+                      <th className="text-right px-6 py-3.5 text-[11px] font-semibold tracking-widest uppercase text-gray-500 w-[130px]">Amount</th>
+                      <th className="hidden lg:table-cell text-left px-6 py-3.5 text-[11px] font-semibold tracking-widest uppercase text-gray-500">Transaction</th>
+                      <th className="text-left px-6 py-3.5 text-[11px] font-semibold tracking-widest uppercase text-gray-500 w-[120px]">Status</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {planPayments.map((p, i) => (
-                      <tr key={`${p.paymentId || p.orderId || i}`} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-6 py-4"><span className="text-gray-500 text-sm whitespace-nowrap">{p.paidAt ? new Date(p.paidAt).toLocaleString() : '—'}</span></td>
-                        <td className="px-6 py-4"><span className="text-gray-900 font-medium">{p.organizationName}</span><span className="block text-xs text-gray-400 font-mono">{p.organizationSlug}</span></td>
-                        <td className="px-6 py-4"><Badge variant="primary">{p.planSlug}</Badge></td>
-                        <td className="px-6 py-4"><span className="text-gray-900 font-medium">{p.currency || 'INR'} {(Number(p.amount || 0) / 100).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></td>
-                        <td className="px-6 py-4"><span className="text-gray-500 text-xs font-mono">{p.orderId || '—'}</span></td>
-                        <td className="px-6 py-4"><span className="text-gray-500 text-xs font-mono">{p.paymentId || '—'}</span></td>
-                        <td className="px-6 py-4"><Badge variant={p.status === 'captured' ? 'success' : 'default'}>{p.status}</Badge></td>
+                      <tr key={`${p.paymentId || p.orderId || i}`} className="hover:bg-gray-50/70 transition-colors">
+                        <td className="hidden md:table-cell px-6 py-4"><span className="text-sm text-gray-600 whitespace-nowrap">{p.paidAt ? new Date(p.paidAt).toLocaleDateString() : '—'}</span></td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <span className="w-8 h-8 rounded-lg bg-gray-900 flex items-center justify-center shrink-0">
+                              <span className="text-white text-xs font-bold">{(p.organizationName || '?').charAt(0).toUpperCase()}</span>
+                            </span>
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium text-gray-900 truncate">{p.organizationName}</p>
+                              <p className="text-xs text-gray-400 font-mono truncate">{p.organizationSlug}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4"><Badge variant="primary" size="sm" className="capitalize whitespace-nowrap">{p.planSlug}</Badge></td>
+                        <td className="px-6 py-4 text-right"><span className="text-sm font-bold text-gray-900 tabular-nums whitespace-nowrap">{p.currency || 'INR'} {(Number(p.amount || 0) / 100).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></td>
+                        <td className="hidden lg:table-cell px-6 py-4">
+                          <div className="font-mono text-xs text-gray-500 space-y-0.5">
+                            <p className="truncate max-w-[180px]" title={p.orderId}>{p.orderId || '—'}</p>
+                            <p className="truncate max-w-[180px] text-gray-400" title={p.paymentId}>{p.paymentId || '—'}</p>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-medium whitespace-nowrap ${p.status === 'captured' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-gray-50 border-gray-200 text-gray-600'}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${p.status === 'captured' ? 'bg-emerald-500' : 'bg-gray-400'}`} />
+                            {p.status || '—'}
+                          </span>
+                        </td>
                       </tr>
                     ))}
                   </tbody>

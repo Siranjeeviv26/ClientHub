@@ -46,6 +46,7 @@ export function OrganizationsPage() {
   const [slug, setSlug] = useState('');
   const [slugTouched, setSlugTouched] = useState(false);
   const [formError, setFormError] = useState('');
+  const [deletePassword, setDeletePassword] = useState('');
 
   const isAdmin = user?.role === 'ADMIN';
 
@@ -115,12 +116,17 @@ export function OrganizationsPage() {
 
   const confirmDelete = async () => {
     if (!deleteTarget) return;
+    if (!deletePassword) {
+      toast.error('Enter your password to confirm deletion');
+      return;
+    }
     setSaving(true);
     try {
-      await organizationsApi.delete(deleteTarget._id);
+      await organizationsApi.delete(deleteTarget._id, deletePassword);
       toast.success(`Workspace "${deleteTarget.name}" deleted`);
       const wasCurrent = deleteTarget._id === organization?._id;
       setDeleteTarget(null);
+      setDeletePassword('');
       if (wasCurrent) {
         // Load fresh list, then move to another workspace or reset
         const res = await organizationsApi.getAll();
@@ -311,12 +317,12 @@ export function OrganizationsPage() {
       {/* Delete Confirm */}
       <Modal
         isOpen={!!deleteTarget}
-        onClose={() => setDeleteTarget(null)}
+        onClose={() => { setDeleteTarget(null); setDeletePassword(''); }}
         title="Delete Workspace"
         footer={
           <div className="flex justify-end gap-2">
-            <Button variant="secondary" onClick={() => setDeleteTarget(null)}>Cancel</Button>
-            <Button variant="danger" onClick={confirmDelete} loading={saving}>Delete</Button>
+            <Button variant="secondary" onClick={() => { setDeleteTarget(null); setDeletePassword(''); }}>Cancel</Button>
+            <Button variant="danger" onClick={confirmDelete} loading={saving} disabled={!deletePassword}>Delete</Button>
           </div>
         }
       >
@@ -330,6 +336,19 @@ export function OrganizationsPage() {
               All clients, leads, deals, tasks and activities in this workspace will be permanently removed. This cannot be undone.
             </p>
           </div>
+        </div>
+        <div className="mt-4">
+          <label htmlFor="delete-password" className="block text-sm font-medium text-gray-700 mb-1.5">
+            Confirm with your password
+          </label>
+          <Input
+            id="delete-password"
+            type="password"
+            autoComplete="current-password"
+            value={deletePassword}
+            onChange={(e) => setDeletePassword(e.target.value)}
+            placeholder="Your account password"
+          />
         </div>
       </Modal>
     </div>
