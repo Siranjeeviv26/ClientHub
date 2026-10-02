@@ -157,7 +157,7 @@ export default function LandingPage() {
 
       {/* Nav */}
       <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${scrollY > 50 ? 'bg-white/70 backdrop-blur-2xl border-b border-gray-200/50 shadow-[0_1px_3px_rgba(0,0,0,0.05)]' : ''}`}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="w-full px-4 sm:px-6 lg:px-10">
           <div className="flex items-center justify-between h-16">
             <button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-lg bg-gray-900 flex items-center justify-center shadow-lg shadow-gray-900/20">
@@ -193,15 +193,15 @@ export default function LandingPage() {
       </nav>
 
       {/* Hero */}
-      <section ref={heroRef} className="relative min-h-screen flex flex-col justify-center pt-24 pb-20 sm:pt-28 sm:pb-24 px-4" onMouseMove={handleMouseMove}>
+      <section ref={heroRef} className="relative min-h-screen flex flex-col justify-center pt-24 pb-20 sm:pt-28 sm:pb-24 px-4 sm:px-6 lg:px-10" onMouseMove={handleMouseMove}>
         {/* Floating orbs */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute -top-40 -right-40 w-[600px] h-[600px] bg-gradient-to-br from-gray-100 to-gray-200/50 rounded-full blur-3xl opacity-60 animate-[float_8s_ease-in-out_infinite]" />
           <div className="absolute top-1/2 -left-40 w-[500px] h-[500px] bg-gradient-to-tr from-gray-200/40 to-gray-100/20 rounded-full blur-3xl opacity-40 animate-[float_10s_ease-in-out_infinite_reverse]" />
         </div>
 
-        <div className="max-w-7xl mx-auto relative">
-          <div className="max-w-4xl mx-auto text-center">
+        <div className="w-full relative">
+          <div className="w-full text-center">
             {/* Badge */}
             <div className="inline-flex items-center gap-2 bg-white/80 backdrop-blur-sm border border-gray-200/60 text-gray-600 text-xs font-medium px-4 py-2 rounded-full mb-8 shadow-sm animate-fade-in hover:shadow-md hover:border-gray-300/60 transition-all duration-300 cursor-default">
               <span className="relative flex h-2 w-2">
@@ -222,7 +222,7 @@ export default function LandingPage() {
               </span>
             </h1>
 
-            <p className="mt-8 text-lg sm:text-xl text-gray-500 max-w-2xl mx-auto leading-relaxed animate-fade-in" style={{ animationDelay: '0.2s' }}>
+            <p className="mt-8 text-lg sm:text-xl text-gray-500 max-w-3xl mx-auto leading-relaxed animate-fade-in" style={{ animationDelay: '0.2s' }}>
               The modern CRM built for high-velocity sales teams. Manage clients, automate workflows, and crush your quota.
             </p>
 
@@ -258,7 +258,7 @@ export default function LandingPage() {
           </div>
 
           {/* Dashboard Preview with tilt */}
-          <div className="mt-24 max-w-5xl mx-auto animate-fade-in" style={{ animationDelay: '0.5s' }}>
+          <div className="mt-24 w-full animate-fade-in" style={{ animationDelay: '0.5s' }}>
             <div
               className="relative group perspective-[1200px]"
               style={{ transform: `perspective(1200px) rotateY(${mousePos.x * 0.3}deg) rotateX(${-mousePos.y * 0.3}deg)`, transition: 'transform 0.1s ease-out' }}
@@ -348,7 +348,7 @@ export default function LandingPage() {
 
       {/* Logos */}
       <section className="py-14 border-y border-gray-200/50 bg-white/40 backdrop-blur-sm overflow-hidden">
-        <div className="max-w-7xl mx-auto px-4">
+        <div className="w-full px-4">
           <p className="text-center text-[11px] font-semibold text-gray-400 uppercase tracking-[0.2em] mb-8">Trusted by leading companies</p>
         </div>
         <div className="relative">
@@ -363,8 +363,8 @@ export default function LandingPage() {
       </section>
 
       {/* Features */}
-      <section id="features" className="py-28 sm:py-36 px-4">
-        <div className="max-w-7xl mx-auto">
+      <section id="features" className="py-28 sm:py-36 px-4 sm:px-6 lg:px-10">
+        <div className="w-full">
           <div ref={f1.ref} className={`max-w-2xl mx-auto text-center mb-20 transition-all duration-700 ${f1.visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
             <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-[0.2em]">Features</span>
             <h2 className="mt-4 text-3xl sm:text-5xl font-bold text-gray-900 tracking-tight leading-tight">Everything you need<br className="hidden sm:block" /> to scale revenue</h2>
@@ -390,8 +390,8 @@ export default function LandingPage() {
       </section>
 
       {/* Modules Showcase */}
-      <section className="py-28 px-4 bg-white/40 backdrop-blur-sm overflow-hidden">
-        <div className="max-w-7xl mx-auto">
+      <section className="py-28 px-4 sm:px-6 lg:px-10 bg-white/40 backdrop-blur-sm overflow-hidden">
+        <div className="w-full">
           <div ref={modRef.ref} className={`max-w-2xl mx-auto text-center mb-16 transition-all duration-700 ${modRef.visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
             <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-[0.2em]">Platform</span>
             <h2 className="mt-4 text-3xl sm:text-5xl font-bold text-gray-900 tracking-tight">One platform, every tool</h2>
@@ -413,8 +413,8 @@ export default function LandingPage() {
       </section>
 
       {/* How it Works */}
-      <section id="how-it-works" className="py-28 sm:py-36 px-4">
-        <div className="max-w-7xl mx-auto">
+      <section id="how-it-works" className="py-28 sm:py-36 px-4 sm:px-6 lg:px-10">
+        <div className="w-full">
           <div className="max-w-2xl mx-auto text-center mb-20">
             <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-[0.2em]">How it Works</span>
             <h2 className="mt-4 text-3xl sm:text-5xl font-bold text-gray-900 tracking-tight">Up and running in minutes</h2>
@@ -445,7 +445,7 @@ export default function LandingPage() {
           <div className="absolute top-0 left-1/3 w-96 h-96 bg-white/5 rounded-full blur-3xl animate-[float_8s_ease-in-out_infinite]" />
           <div className="absolute bottom-0 right-1/3 w-96 h-96 bg-white/5 rounded-full blur-3xl animate-[float_10s_ease-in-out_infinite_reverse]" />
         </div>
-        <div className="max-w-7xl mx-auto px-4 relative">
+        <div className="w-full px-4 sm:px-6 lg:px-10 relative">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
             {[
               { value: 10, suffix: 'K+', label: 'Active Users' },
@@ -465,8 +465,8 @@ export default function LandingPage() {
       </section>
 
       {/* Testimonials */}
-      <section id="testimonials" className="py-28 sm:py-36 px-4">
-        <div className="max-w-7xl mx-auto">
+      <section id="testimonials" className="py-28 sm:py-36 px-4 sm:px-6 lg:px-10">
+        <div className="w-full">
           <div className="max-w-2xl mx-auto text-center mb-16">
             <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-[0.2em]">Testimonials</span>
             <h2 className="mt-4 text-3xl sm:text-5xl font-bold text-gray-900 tracking-tight">Loved by sales teams</h2>
@@ -498,8 +498,8 @@ export default function LandingPage() {
       </section>
 
       {/* Pricing */}
-      <section id="pricing" className="py-28 sm:py-36 px-4 bg-white/40 backdrop-blur-sm">
-        <div className="max-w-7xl mx-auto">
+      <section id="pricing" className="py-28 sm:py-36 px-4 sm:px-6 lg:px-10 bg-white/40 backdrop-blur-sm">
+        <div className="w-full">
           <div className="max-w-2xl mx-auto text-center mb-16">
             <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-[0.2em]">Pricing</span>
             <h2 className="mt-4 text-3xl sm:text-5xl font-bold text-gray-900 tracking-tight">Simple, transparent pricing</h2>
@@ -511,7 +511,7 @@ export default function LandingPage() {
               <p className="text-sm text-gray-500 mt-3">Loading plans...</p>
             </div>
           ) : plans.length > 0 ? (
-            <div className={`grid gap-6 max-w-5xl mx-auto ${plans.length === 1 ? 'max-w-md' : plans.length === 2 ? 'md:grid-cols-2 max-w-2xl' : 'md:grid-cols-3'}`}>
+            <div className={`grid gap-6 w-full ${plans.length === 1 ? 'max-w-md mx-auto' : plans.length === 2 ? 'md:grid-cols-2 max-w-3xl mx-auto' : 'md:grid-cols-3'}`}>
               {plans.map((plan, i) => {
                 const isPopular = plans.length >= 3 && i === Math.floor(plans.length / 2);
                 return (
@@ -560,8 +560,8 @@ export default function LandingPage() {
       </section>
 
       {/* FAQ */}
-      <section id="faq" className="py-28 sm:py-36 px-4">
-        <div className="max-w-3xl mx-auto">
+      <section id="faq" className="py-28 sm:py-36 px-4 sm:px-6 lg:px-10">
+        <div className="w-full max-w-6xl mx-auto">
           <div className="text-center mb-16">
             <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-[0.2em]">FAQ</span>
             <h2 className="mt-4 text-3xl sm:text-5xl font-bold text-gray-900 tracking-tight">Frequently asked questions</h2>
@@ -585,8 +585,8 @@ export default function LandingPage() {
       </section>
 
       {/* CTA */}
-      <section ref={ctaRef.ref} className="py-28 sm:py-36 px-4">
-        <div className="max-w-7xl mx-auto">
+      <section ref={ctaRef.ref} className="py-28 sm:py-36 px-4 sm:px-6 lg:px-10">
+        <div className="w-full">
           <div className={`relative bg-gray-900 rounded-3xl p-14 sm:p-24 text-center overflow-hidden transition-all duration-700 ${ctaRef.visible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
             <div className="absolute inset-0 bg-gradient-to-br from-gray-800 via-gray-900 to-gray-800" />
             <div className="absolute inset-0">
@@ -609,8 +609,8 @@ export default function LandingPage() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-gray-200/50 bg-white/40 backdrop-blur-sm py-16 px-4">
-        <div className="max-w-7xl mx-auto">
+      <footer className="border-t border-gray-200/50 bg-white/40 backdrop-blur-sm py-16 px-4 sm:px-6 lg:px-10">
+        <div className="w-full">
           <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-10">
             <div className="lg:col-span-2">
               <button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="flex items-center gap-2.5 mb-5">
