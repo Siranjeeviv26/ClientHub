@@ -193,7 +193,7 @@ export default function LandingPage() {
       </nav>
 
       {/* Hero */}
-      <section ref={heroRef} className="relative pt-28 pb-20 sm:pt-32 sm:pb-32 px-4" onMouseMove={handleMouseMove}>
+      <section ref={heroRef} className="relative min-h-screen flex flex-col justify-center pt-24 pb-20 sm:pt-28 sm:pb-24 px-4" onMouseMove={handleMouseMove}>
         {/* Floating orbs */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute -top-40 -right-40 w-[600px] h-[600px] bg-gradient-to-br from-gray-100 to-gray-200/50 rounded-full blur-3xl opacity-60 animate-[float_8s_ease-in-out_infinite]" />
